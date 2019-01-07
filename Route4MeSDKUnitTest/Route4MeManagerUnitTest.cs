@@ -6119,9 +6119,9 @@ namespace Route4MeSDKUnitTest
             // Run the query
             bool optimalPosition = true;
             string errorString;
-            int[] destinationIds = route4Me.AddRouteDestinations(route_id, addresses, optimalPosition, out errorString);
+            Address[] destinations = route4Me.AddRouteDestinations(route_id, addresses, optimalPosition, out errorString);
 
-            Assert.IsInstanceOfType(destinationIds, typeof(System.Int32[]), "AddRouteDestinationsTest failed...");
+            Assert.IsInstanceOfType(destinations, typeof(Address[]), "AddRouteDestinationsTest failed...");
         }
 
         [TestMethod]
