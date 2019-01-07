@@ -5,3 +5,5 @@ shortTest.cs
 /**/obj/
 /packages/
 /TestResults/
+.vs
+/**/bin/
