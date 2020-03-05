@@ -1,7 +1,6 @@
 ﻿using Route4MeSDK.DataTypes;
 using Route4MeSDK.QueryTypes;
 using System;
-using System.Linq;
 
 namespace Route4MeSDK.Examples
 {
@@ -33,22 +32,22 @@ namespace Route4MeSDK.Examples
       // Run the query
       bool optimalPosition = true;
       string errorString;
-      Address[] destinations = route4Me.AddRouteDestinations(routeId, addresses, optimalPosition, out errorString);
+      int[] destinationIds = route4Me.AddRouteDestinations(routeId, addresses, optimalPosition, out errorString);
 
       Console.WriteLine("");
-            
-      if (destinations != null)
+
+      if (destinationIds != null)
       {
         Console.WriteLine("AddRouteDestinations executed successfully");
 
-        Console.WriteLine("Destination IDs: {0}", string.Join(" ", destinations.Select(d=>d.RouteDestinationId)));
+        Console.WriteLine("Destination IDs: {0}", string.Join(" ", destinationIds));
       }
       else
       {
         Console.WriteLine("AddRouteDestinations error: {0}", errorString);
       }
 
-      return destinations?.Select(d => d.RouteDestinationId.GetValueOrDefault()).ToArray();
+      return destinationIds;
 
     }
   }

@@ -59,6 +59,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml" />
     <Reference Include="nunit.framework">
@@ -107,12 +108,15 @@
     <Compile Include="Examples\Addresses\ResequenceRouteDestinations.cs" />
     <Compile Include="Examples\AvoidanceZones\AddPolygonAvoidanceZone.cs" />
     <Compile Include="Examples\AvoidanceZones\AddRectAvoidanceZone.cs" />
+    <Compile Include="Examples\RouteExamples\AsyncMultipleDepotMultipleDriver.cs" />
+    <Compile Include="Examples\Users\CreateUser.cs" />
     <Compile Include="Examples\Databases\GenerateSqlDatabase.cs" />
     <Compile Include="Examples\Databases\MakeAddressbookCSVsample.cs" />
     <Compile Include="Examples\Databases\UploadAddressbookJSONtoSQL.cs" />
     <Compile Include="Examples\Databases\UploadCsvToAddressbookV4.cs" />
     <Compile Include="Examples\Databases\UploadCsvToOrders.cs" />
     <Compile Include="Examples\Databases\UploadOrdersJSONtoSQL.cs" />
+    <Compile Include="Examples\Users\DeleteUser.cs" />
     <Compile Include="Examples\Geocoding\GeocodingForward.cs" />
     <Compile Include="Examples\Geocoding\RapidStreetDataAll.cs" />
     <Compile Include="Examples\Geocoding\RapidStreetDataLimited.cs" />
@@ -122,6 +126,8 @@
     <Compile Include="Examples\Geocoding\RapidStreetZipcodeAll.cs" />
     <Compile Include="Examples\Geocoding\RapidStreetZipcodeLimited.cs" />
     <Compile Include="Examples\Geocoding\ReverseGeocoding.cs" />
+    <Compile Include="Examples\Users\GetUserById.cs" />
+    <Compile Include="Examples\Users\GetUsers.cs" />
     <Compile Include="Examples\MemberConfiguration\AddNewConfigurationKey.cs" />
     <Compile Include="Examples\MemberConfiguration\GetAllConfigurationData.cs" />
     <Compile Include="Examples\MemberConfiguration\GetSpecificConfigurationKeyData.cs" />
@@ -157,6 +163,7 @@
     <Compile Include="Examples\RouteExamples\SingleDriverRoundTrip.cs" />
     <Compile Include="Examples\RouteExamples\SingleDriverRoundTripGeneric.cs" />
     <Compile Include="Examples\RouteExamples\SingleDriverRoute10Stops.cs" />
+    <Compile Include="Examples\RouteExamples\SingleDriverRoute7Stops.cs" />
     <Compile Include="Examples\Routes\UpdateRouteDestination.cs" />
     <Compile Include="Examples\Routes\DeleteRoutes.cs" />
     <Compile Include="Examples\Routes\DuplicateRoute.cs" />
@@ -188,10 +195,6 @@
     <Compile Include="Examples\Territories\UpdateTerritory.cs" />
     <Compile Include="Examples\Tracking\FindAsset.cs" />
     <Compile Include="Examples\Tracking\GetDeviceHistoryTimeRange.cs" />
-    <Compile Include="Examples\Users\CreateUser.cs" />
-    <Compile Include="Examples\Users\DeleteUser.cs" />
-    <Compile Include="Examples\Users\GetUserById.cs" />
-    <Compile Include="Examples\Users\GetUsers.cs" />
     <Compile Include="Examples\Addresses\MoveDestinationToRoute.cs" />
     <Compile Include="Examples\AddressBook\RemoveAddressBookContacts.cs" />
     <Compile Include="Examples\Addresses\RemoveRouteDestination.cs" />
@@ -215,7 +218,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Route4MeSDKLibrary\Route4MeSDKLibrary.csproj">
@@ -224,13 +226,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\test.png" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\test.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

@@ -2,54 +2,55 @@
 
 namespace Route4MeSDK.DataTypes
 {
-  /// <summary>
-  /// Main data object data-structure
-  /// See https://www.assembla.com/spaces/route4me_api/wiki/Optimization_Problem_V4
-  /// </summary>
-  [DataContract]
-  [KnownType(typeof(DataObjectRoute))]
-  public class DataObject
-  {
-    [DataMember(Name = "optimization_problem_id")]
-    public string OptimizationProblemId { get; set; }
+    /// <summary>
+    /// Main data object data-structure
+    /// See <see cref="https://www.assembla.com/spaces/route4me_api/wiki/Optimization_Problem_V4"/>  
+    /// </summary>
+    [DataContract]
+    public class DataObject : DataObjectBase
+    {
+        /// <summary>
+        /// An optimization problem state. See <see cref="OptimizationState"/>
+        /// </summary>
+        /// 
+        [DataMember(Name = "state")]
+        public OptimizationState State { get; set; }
 
-    [DataMember(Name = "state")]
-    public OptimizationState State { get; set; }
+        /// <summary>
+        /// An array of the user errors
+        /// </summary>
+        [DataMember(Name = "user_errors")]
+        public string[] UserErrors { get; set; }
 
-    [DataMember(Name = "user_errors")]
-    public string[] UserErrors { get; set; }
+        /// <summary>
+        /// An array of the optimization errors
+        /// </summary>
+        [DataMember(Name = "optimization_errors")]
+        public string[] OptimizationErrors { get; set; }
 
-    [DataMember(Name = "sent_to_background")]
-    public bool IsSentToBackground { get; set; }
+        /// <summary>
+        /// If true it means the solution was not returned (it is being computed in the background)
+        /// </summary>
+        [DataMember(Name = "sent_to_background")]
+        public bool IsSentToBackground { get; set; }
 
-    [DataMember(Name = "created_timestamp", EmitDefaultValue = false)]
-    public long? CreatedTimestamp { get; set; }
+        /// <summary>
+        /// An Unix Timestamp the Optimization Problem was scheduled for
+        /// </summary>
+        [DataMember(Name = "scheduled_for", EmitDefaultValue = false)]
+        public long? ScheduledFor { get; set; }
 
-    [DataMember(Name = "scheduled_for", EmitDefaultValue = false)]
-    public long? ScheduledFor { get; set; }
+        /// <summary>
+        /// An array ot the DataObjectRoute type objects. See <see cref="DataObjectRoute"/>
+        /// <para>The routes included in the optimization problem</para>
+        /// </summary>
+        [DataMember(Name = "routes")]
+        public DataObjectRoute[] Routes { get; set; }
 
-    [DataMember(Name = "parameters")]
-    public RouteParameters Parameters { get; set; }
-
-    [DataMember(Name = "addresses")]
-    public Address[] Addresses { get; set; }
-
-    [DataMember(Name = "routes")]
-    public DataObjectRoute[] Routes { get; set; }
-
-    [DataMember(Name = "links")]
-    public Links Links { get; set; }
-
-    [DataMember(Name = "tracking_history")]
-    public TrackingHistory[] TrackingHistory { get; set; }
-
-    [DataMember(Name = "directions")]
-    public Direction[] Directions { get; set; }
-
-    [DataMember(Name = "path")]
-    public DirectionPathPoint[] Path { get; set; }
-
-    [DataMember(Name = "total_addresses", EmitDefaultValue = false)]
-    public int? TotalAddresses { get; set; }
+        /// <summary>
+        /// Total number of the addresses included in the optimization
+        /// </summary>
+        [DataMember(Name = "total_addresses", EmitDefaultValue = false)]
+        public int? TotalAddresses { get; set; }
     }
 }

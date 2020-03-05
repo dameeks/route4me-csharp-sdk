@@ -8,33 +8,24 @@ namespace Route4MeSDK.QueryTypes
         /// Device Id
         /// </summary>
         [HttpQueryMemberAttribute(Name = "device_id", EmitDefaultValue = false)]
-        public string DeviceID
-        {
-            get { return m_DeviceID; }
-            set { m_DeviceID = value; }
-        }
-        private string m_DeviceID;
+        public string DeviceID { get; set; }
 
         /// <summary>
         /// Territory Id
         /// </summary>
         [HttpQueryMemberAttribute(Name = "territory_id", EmitDefaultValue = false)]
-        public string TerritoryId
-        {
-            get { return m_TerritoryId; }
-            set { m_TerritoryId = value; }
-        }
-        private string m_TerritoryId;
+        public string TerritoryId { get; set; }
 
         /// <summary>
-        /// Territory Id
+        /// If equal = 1, the enclosed addresses will be included in the response.
         /// </summary>
         [HttpQueryMemberAttribute(Name = "addresses", EmitDefaultValue = false)]
-        public System.Nullable<int> addresses
-        {
-            get { return m_addresses; }
-            set { m_addresses = value; }
-        }
-        private System.Nullable<int> m_addresses;
+        public int? Addresses { get; set; }
+
+        /// <summary>
+        /// If equal = 1, the enclosed orders will be included in the response.
+        /// </summary>
+        [HttpQueryMemberAttribute(Name = "orders", EmitDefaultValue = false)]
+        public int? Orders { get; set; }
     }
 }

@@ -15,7 +15,13 @@ namespace Route4MeSDK.QueryTypes
         public string MemberId {get; set;}
 
         [DataMember(Name = "is_deleted", EmitDefaultValue = false)]
-        public System.Nullable<bool> IsDeleted  {get; set;}
+        public bool? IsDeleted  {get; set;}
+
+        /// <summary>
+        /// Required for a vehicle creating.
+        /// </summary>
+        [DataMember(Name = "vehicle_name", EmitDefaultValue = false)]
+        public string VehicleName { get; set; }
 
         [DataMember(Name = "vehicle_alias", EmitDefaultValue = false)]
         public string VehicleAlias { get; set; }
@@ -30,7 +36,7 @@ namespace Route4MeSDK.QueryTypes
         public string VehicleRegStateId {get; set;}
 
         [DataMember(Name = "vehicle_reg_country_id", EmitDefaultValue = false)]
-        public System.Nullable<int> VehicleRegCountryId {get; set;}
+        public int? VehicleRegCountryId {get; set;}
 
         [DataMember(Name = "vehicle_license_plate", EmitDefaultValue = false)]
         public string VehicleLicensePlate {get; set;}
@@ -45,19 +51,19 @@ namespace Route4MeSDK.QueryTypes
         public string VehicleMake {get; set;}
 
         [DataMember(Name = "vehicle_model_year", EmitDefaultValue = false)]
-        public System.Nullable<int> VehicleModelYear {get; set;}
+        public int? VehicleModelYear {get; set;}
 
         [DataMember(Name = "vehicle_model", EmitDefaultValue = false)]
         public string VehicleModel {get; set;}
 
         [DataMember(Name = "vehicle_year_acquired", EmitDefaultValue = false)]
-        public System.Nullable<int> VehicleYearAcquired {get; set;}
+        public int? VehicleYearAcquired {get; set;}
 
         [DataMember(Name = "vehicle_cost_new", EmitDefaultValue = false)]
-        public System.Nullable<double> VehicleCostNew {get; set;}
+        public double? VehicleCostNew {get; set;}
 
         [DataMember(Name = "purchased_new", EmitDefaultValue = false)]
-        public System.Nullable<bool> PurchasedNew {get; set;}
+        public bool? PurchasedNew {get; set;}
 
         [DataMember(Name = "license_start_date", EmitDefaultValue = false)]
         public string LicenseStartDate {get; set;}
@@ -65,29 +71,42 @@ namespace Route4MeSDK.QueryTypes
         [DataMember(Name = "license_end_date", EmitDefaultValue = false)]
         public string LicenseEndDate {get; set;}
 
+        /// <summary>
+        /// Vehicle axle count.
+        /// Available values: 2,3,4
+        /// </summary>
         [DataMember(Name = "vehicle_axle_count", EmitDefaultValue = false)]
-        public System.Nullable<int> VehicleAxleCount {get; set;}
+        public int? VehicleAxleCount {get; set;}
 
         [DataMember(Name = "mpg_city", EmitDefaultValue = false)]
-        public System.Nullable<int> MpgCity {get; set;}
+        public int? MpgCity {get; set;}
 
         [DataMember(Name = "mpg_highway", EmitDefaultValue = false)]
-        public System.Nullable<int> MpgHighway {get; set;}
+        public int? MpgHighway {get; set;}
 
         [DataMember(Name = "fuel_type", EmitDefaultValue = false)]
         public string FuelType {get; set;}
 
         [DataMember(Name = "height_inches", EmitDefaultValue = false)]
-        public System.Nullable<int> HeightInches {get; set;}
+        public int? HeightInches {get; set;}
 
         [DataMember(Name = "weight_lb", EmitDefaultValue = false)]
-        public System.Nullable<int> WeightLb {get; set;}
+        public int? WeightLb {get; set;}
+
+        [DataMember(Name = "route4me_telematics_internal_api_key", EmitDefaultValue = false)]
+        public string Route4meTelematicsInternalApiKey { get; set; }
 
         [DataMember(Name = "is_operational", EmitDefaultValue = false)]
-        public System.Nullable<bool> IsOperational {get; set;}
+        public bool? IsOperational {get; set;}
 
         [DataMember(Name = "external_telematics_vehicle_id", EmitDefaultValue = false)]
         public string ExternalTelematicsVehicleID {get; set;}
+
+        [DataMember(Name = "r4m_telematics_gateway_connection_id", EmitDefaultValue = false)]
+        public string R4mTelematicsGatewayConnectionId { get; set; }
+
+        [DataMember(Name = "r4m_telematics_gateway_vehicle_id", EmitDefaultValue = false)]
+        public string R4mTelematicsGatewayVehicleId { get; set; }
 
         [DataMember(Name = "has_trailer", EmitDefaultValue = false)]
         public bool HasTrailer {get; set;}
@@ -96,19 +115,19 @@ namespace Route4MeSDK.QueryTypes
         public string HeightInInches {get; set;}
 
         [DataMember(Name = "lengthInInches", EmitDefaultValue = false)]
-        public System.Nullable<int> LengthInInches {get; set;}
+        public int? LengthInInches {get; set;}
 
         [DataMember(Name = "widthInInches", EmitDefaultValue = false)]
-        public System.Nullable<int> WidthInInches {get; set;}
+        public int? WidthInInches {get; set;}
 
         [DataMember(Name = "maxWeightPerAxleGroupInPounds", EmitDefaultValue = false)]
-        public System.Nullable<int> MaxWeightPerAxleGroupInPounds {get; set;}
+        public int? MaxWeightPerAxleGroupInPounds {get; set;}
 
         [DataMember(Name = "numAxles", EmitDefaultValue = false)]
-        public System.Nullable<int> NumAxles {get; set;}
+        public int? NumAxles {get; set;}
 
         [DataMember(Name = "weightInPounds", EmitDefaultValue = false)]
-        public System.Nullable<int> WeightInPounds {get; set;}
+        public int? WeightInPounds {get; set;}
 
         [DataMember(Name = "HazmatType", EmitDefaultValue = false)]
         public string HazmatType {get; set;}
@@ -156,19 +175,19 @@ namespace Route4MeSDK.QueryTypes
         public string TruckConfig {get; set;}
 
         [DataMember(Name = "height_metric", EmitDefaultValue = false)]
-        public System.Nullable<float> HeightMetric {get; set;}
+        public float? HeightMetric {get; set;}
 
         [DataMember(Name = "length_metric", EmitDefaultValue = false)]
-        public System.Nullable<float> LengthMetric {get; set;}
+        public float? LengthMetric {get; set;}
 
         [DataMember(Name = "width_metric", EmitDefaultValue = false)]
-        public System.Nullable<float> WidthMetric {get; set;}
+        public float? WidthMetric {get; set;}
 
         [DataMember(Name = "weight_metric", EmitDefaultValue = false)]
-        public System.Nullable<float> WeightMetric {get; set;}
+        public float? WeightMetric {get; set;}
 
         [DataMember(Name = "max_weight_per_axle_group_metric", EmitDefaultValue = false)]
-        public System.Nullable<float> MaxWeightPerAxleGroupMetric {get; set;}
+        public float? MaxWeightPerAxleGroupMetric {get; set;}
 
         [DataMember(Name = "timestamp_removed", EmitDefaultValue = false)]
         public string TimestampRemoved {get; set;}

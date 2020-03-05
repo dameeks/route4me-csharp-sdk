@@ -3,105 +3,243 @@ using System.Collections.Generic;
 
 namespace Route4MeSDK.DataTypes
 {
+    /// <summary>
+    /// Response from the asset finding request
+    /// </summary>
     [DataContract]
     public sealed class FindAssetResponse
     {
+        /// <summary>
+        /// Tracking number
+        /// </summary>
         [DataMember(Name = "tracking_number")]
-        public string TrackingNumber
-        {
-            get { return m_TrackingNumber; }
-            set { m_TrackingNumber = value; }
-        }
-        private string m_TrackingNumber;
+        public string TrackingNumber { get; set; }
 
+        /// <summary>
+        /// A link to a large logo
+        /// </summary>
+        [DataMember(Name = "large_logo_uri")]
+        public string LargeLogoUri { get; set; }
+
+        /// <summary>
+        /// A link to a mobile logo
+        /// </summary>
+        [DataMember(Name = "mobile_logo_uri")]
+        public string MobileLogoUri { get; set; }
+
+        /// <summary>
+        /// The asset color on a map
+        /// </summary>
+        [DataMember(Name = "map_color")]
+        public string MapColor { get; set; }
+
+        /// <summary>
+        /// An alignment of a large logo
+        /// </summary>
+        [DataMember(Name = "large_logo_alignment")]
+        public string LargeLogoAlignment { get; set; }
+
+        /// <summary>
+        /// An alignment of a mobile logo
+        /// </summary>
+        [DataMember(Name = "mobile_logo_alignment")]
+        public string MobileLogoAlignment { get; set; }
+
+        /// <summary>
+        /// An alignment of a mobile logo
+        /// </summary>
+        [DataMember(Name = "show_map_zoom_controls")]
+        public bool? ShowMapZoomControls { get; set; }
+
+        /// <summary>
+        /// Driver phone number
+        /// </summary>
+        [DataMember(Name = "driver_phone")]
+        public string DriverPhone { get; set; }
+
+        /// <summary>
+        /// Route started timestamp
+        /// </summary>
+        [DataMember(Name = "route_started")]
+        public bool? RouteStarted { get; set; }
+
+        /// <summary>
+        /// Customer service phone
+        /// </summary>
+        [DataMember(Name = "customer_service_phone")]
+        public string CustomerServicePhone { get; set; }
+
+        /// <summary>
+        /// Driver name
+        /// </summary>
+        [DataMember(Name = "driver_name")]
+        public string DriverName { get; set; }
+
+        /// <summary>
+        /// A link to a driver picture file
+        /// </summary>
+        [DataMember(Name = "driver_picture")]
+        public string DriverPicture { get; set; }
+
+        /// <summary>
+        /// A subheadline of a tracking page
+        /// </summary>
+        [DataMember(Name = "tracking_page_subheadline")]
+        public string TrackingPageSubheadline { get; set; }
+
+        /// <summary>
+        /// A first destination address
+        /// </summary>
+        [DataMember(Name = "destination_address_1")]
+        public string DestinationAddress1 { get; set; }
+
+        /// <summary>
+        /// A second destination address
+        /// </summary>
+        [DataMember(Name = "destination_address_2")]
+        public string DestinationAddress2 { get; set; }
+
+        /// <summary>
+        /// Asset status history
+        /// </summary>
         [DataMember(Name = "status_history")]
-        public string[] StatusHistory
-        {
-            get { return m_StatusHistory; }
-            set { m_StatusHistory = value; }
-        }
-        private string[] m_StatusHistory;
+        public AssetStatusHistory[] StatusHistory { get; set; }
 
+        /// <summary>
+        /// An array of the asset locations. See <see cref="FindAssetResponseLocations"/>
+        /// </summary>
         [DataMember(Name = "locations")]
-        public FindAssetResponseLocations[] Locations
-        {
-            get { return m_Locations; }
-            set { m_Locations = value; }
-        }
-        private FindAssetResponseLocations[] m_Locations;
+        public FindAssetResponseLocations[] Locations { get; set; }
 
+        /// <summary>
+        /// Custom data
+        /// </summary>
         [DataMember(Name = "custom_data", EmitDefaultValue = false)]
-        public Dictionary<string, string> CustomData
-        {
-            get { return m_CustomData; }
-            set { m_CustomData = value; }
-        }
-        private Dictionary<string, string> m_CustomData;
+        public Dictionary<string, string> CustomData { get; set; }
 
+        /// <summary>
+        /// Arrival time of the asset. See <see cref="FindAssetResponseArrival"/>
+        /// </summary>
         [DataMember(Name = "arrival")]
-        public FindAssetResponseArrival[] Arrival
-        {
-            get { return m_Arrival; }
-            set { m_Arrival = value; }
-        }
-        private FindAssetResponseArrival[] m_Arrival;
+        public FindAssetResponseArrival[] Arrival { get; set; }
 
+        /// <summary>
+        /// True if the asset was delivered
+        /// </summary>
         [DataMember(Name = "delivered", EmitDefaultValue = false)]
-        public System.Nullable<bool> Delivered
-        {
-            get { return m_Delivered; }
-            set { m_Delivered = value; }
-        }
-        private System.Nullable<bool> m_Delivered;
+        public bool? Delivered { get; set; }
+
+        /// <summary>
+        /// UNIX timestamp when a geofence visited event was triggered.
+        /// </summary>
+        [DataMember(Name = "timestamp_geofence_visited")]
+        public long? TimestampGeofenceVisited { get; set; }
+
+        /// <summary>
+        /// UNIX timestamp of a last visited event.
+        /// </summary>
+        [DataMember(Name = "timestamp_last_visited")]
+        public long? TimestampLastVisited { get; set; }
     }
 
+    /// <summary>
+    /// The subclass of the FindAssetResponse class. See <see cref="FindAssetResponse"/>
+    /// </summary>
     [DataContract()]
     public sealed class FindAssetResponseLocations
     {
+        /// <summary>
+        /// If true, current location is destination.
+        /// </summary>
+        [DataMember(Name = "is_destination")]
+        public bool? IsDestination { get; set; }
+
+        /// <summary>
+        /// Latitude.
+        /// </summary>
         [DataMember(Name = "lat")]
-        public double Latitude
-        {
-            get { return m_Latitude; }
-            set { m_Latitude = value; }
-        }
-        private double m_Latitude;
+        public double Latitude { get; set; }
 
+        /// <summary>
+        /// Longitude.
+        /// </summary>
         [DataMember(Name = "lng")]
-        public double Longitude
-        {
-            get { return m_Longitude; }
-            set { m_Longitude = value; }
-        }
-        private double m_Longitude;
+        public double Longitude { get; set; }
 
+        /// <summary>
+        /// The asset's location icon.
+        /// </summary>
         [DataMember(Name = "icon")]
-        public string Icon
-        {
-            get { return m_Icon; }
-            set { m_Icon = value; }
-        }
-        private string m_Icon;
+        public string Icon { get; set; }
+
+        /// <summary>
+        /// Size of the icon.
+        /// </summary>
+        [DataMember(Name = "size")]
+        public int? Size { get; set; }
+
+        /// <summary>
+        /// A icon's acnhor position.
+        /// </summary>
+        [DataMember(Name = "anchor")]
+        public int[] Anchor { get; set; }
+
+        /// <summary>
+        /// Popup position of an icon. 
+        /// </summary>
+        [DataMember(Name = "popupAnchor")]
+        public int[] PopupAnchor { get; set; }
+
+        /// <summary>
+        /// Rotation angle.
+        /// </summary>
+        [DataMember(Name = "angle")]
+        public int? Angle { get; set; }
+
+        /// <summary>
+        /// Information about a shipped package at a specified location.
+        /// </summary>
+        [DataMember(Name = "info")]
+        public string Info { get; set; }
     }
 
+    /// <summary>
+    /// The subclass of the FindAssetResponse class. See <see cref="FindAssetResponse"/>
+    /// </summary>
     [DataContract()]
     public sealed class FindAssetResponseArrival
     {
+        /// <summary>
+        /// Start of the arrival time
+        /// </summary>
         [DataMember(Name = "from_unix_timestamp")]
-        public System.Nullable<int> FromUnixTimestamp
-        {
-            get { return m_FromUnixTimestamp; }
-            set { m_FromUnixTimestamp = value; }
-        }
-        private System.Nullable<int> m_FromUnixTimestamp;
+        public int? FromUnixTimestamp { get; set; }
 
-
+        /// <summary>
+        /// End of the arrival time
+        /// </summary>
         [DataMember(Name = "to_unix_timestamp")]
-        public System.Nullable<int> ToUnixTimestamp
-        {
-            get { return m_ToUnixTimestamp; }
-            set { m_ToUnixTimestamp = value; }
-        }
-        private System.Nullable<int> m_ToUnixTimestamp;
+        public int? ToUnixTimestamp { get; set; }
     }
 
-  }
+    /// <summary>
+    /// The subclass of the FindAssetResponse class. See <see cref="FindAssetResponse"/>
+    /// </summary>
+    [DataContract()]
+    public sealed class AssetStatusHistory
+    {
+        /// <summary>
+        /// Status getting timestamp
+        /// </summary>
+        [DataMember(Name = "unix_timestamp")]
+        public long? UnixTimestamp { get; set; }
+
+        /// <summary>
+        /// nformation about a shipped package.
+        /// enum: ["Order Received", "Order Assigned to Route", "Packing", "Loaded to Vehicle", "Out for Delivery"]
+        /// </summary>
+        [DataMember(Name = "info")]
+        public string Info { get; set; }
+    }
+
+}
