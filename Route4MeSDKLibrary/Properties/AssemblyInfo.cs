@@ -34,6 +34,6 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.4")]
 [assembly: AssemblyFileVersion("1.0.0.4")]
-[assembly: InternalsVisibleTo("Route4MeSDKLibrary.Tests")]
-[assembly: InternalsVisibleTo("Route4MeSDKLibrary.Explorables")]
+//[assembly: InternalsVisibleTo("Route4MeSDKLibrary.Tests")]
+//[assembly: InternalsVisibleTo("Route4MeSDKLibrary.Explorables")]
 

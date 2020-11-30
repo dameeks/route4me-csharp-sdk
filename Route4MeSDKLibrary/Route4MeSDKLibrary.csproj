@@ -36,8 +36,7 @@
     <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <PropertyGroup>
-    <AssemblyOriginatorKeyFile>
-    </AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>bms_route4me_key.pfx</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="fastJSON, Version=2.2.0.0, Culture=neutral, PublicKeyToken=6b75a806b86095cd, processorArchitecture=MSIL">
@@ -189,7 +188,10 @@
     <None Include="app.config">
       <SubType>Designer</SubType>
     </None>
+    <None Include="BMS-Route4Me-Key.pfx" />
+    <None Include="bms_route4me_key.pfx" />
     <None Include="packages.config" />
+    <None Include="r4m_csharp_sdk.snk" />
     <None Include="Route4MeExcelAddIn_1_TemporaryKey.pfx" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

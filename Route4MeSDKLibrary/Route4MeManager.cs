@@ -1699,60 +1699,74 @@ namespace Route4MeSDK
 			public bool OptimalPosition { get; set; }
 		}
 
-		/// <summary>
-		/// Adds address(es) into a route.
-		/// </summary>
-		/// <param name="routeId"> The route ID </param>
-		/// <param name="addresses"> Valid array of the Address type objects. </param>
-		/// <param name="optimalPosition"> If true, an address will be inserted at optimal position of a route </param>
-		/// <param name="errorString"> out: Error as string </param>
-		/// <returns> An array of the IDs of added addresses </returns>
-		public int[] AddRouteDestinations(string routeId, Address[] addresses, bool optimalPosition, out string errorString)
-		{
-			AddRouteDestinationRequest request = new AddRouteDestinationRequest()
-			{
-				RouteId = routeId,
-				Addresses = addresses,
-				OptimalPosition = optimalPosition
-			};
+        public Address[] AddRouteDestinations(string routeId, Address[] addresses, bool optimalPosition, Func<Address, Address, bool> comparer, out string errorString)
+        {
+            AddRouteDestinationRequest request = new AddRouteDestinationRequest()
+            {
+                RouteId = routeId,
+                Addresses = addresses,
+                OptimalPosition = optimalPosition
+            };
 
-			DataObject response = GetJsonObjectFromAPI<DataObject>(request,
-																   R4MEInfrastructureSettings.RouteHost,
-																   HttpMethodType.Put,
-																   out errorString);
-
-            List<int> arrDestinationIds = new List<int>();
-
+            DataObject response = this.GetJsonObjectFromAPI<DataObject>(request,
+                                                             R4MEInfrastructureSettings.RouteHost,
+                                                             HttpMethodType.Put,
+                                                             out errorString);
+            Address[] destinations = null;
             if (response != null && response.Addresses != null)
-			{
-                addresses.ForEach(addressNew =>
+            {
+                List<Address> arrDestinations = new List<Address>();
+                foreach (Address addressNew in addresses)
                 {
-                    response.Addresses.Where(addressResp => (
-                        addressResp.AddressString == addressNew.AddressString &&
-                        addressResp.Latitude == addressNew.Latitude && 
-                        addressResp.Longitude == addressNew.Longitude && 
-                        addressResp.RouteDestinationId != null
-                    )).ForEach(addrResp => {
-                        arrDestinationIds.Add((int)addrResp.RouteDestinationId);
-                    });
-                });
-			}
-
-			return arrDestinationIds.ToArray();
-		}
+                    Address foundAddress = null;
+                    foreach (Address addressResp in response.Addresses)
+                    {
+                        if (comparer(addressResp, addressNew))
+                        {
+                            foundAddress = addressResp;
+                        }
+                    }
+                    if (foundAddress != null)
+                    {
+                        arrDestinations.Add(foundAddress);
+                    }
+                }
+                destinations = arrDestinations.ToArray();
+            }
+            return destinations;
+        }
 
         /// <summary>
-        /// Adds the address(es) into a route.
+        /// Add address(es) into a route.
         /// </summary>
-        /// <param name="routeId"> The route ID </param>
-        /// <param name="addresses"> Valid array of the Address type objects. </param>
+        /// <param name="routeId"> Route ID </param>
+        /// <param name="addresses"> Valid array of Address objects. </param>
+        /// <param name="optimalPosition"> If true, an address will be inserted at optimal position of a route </param>
         /// <param name="errorString"> out: Error as string </param>
-        /// <returns>An array of the IDs of added addresses </returns>
-        public int[] AddRouteDestinations(string routeId, Address[] addresses, out string errorString)
-		{
-			return this.AddRouteDestinations(routeId, addresses, true, out errorString);
-		}
+        /// <returns> IDs of added addresses </returns>
+        public Address[] AddRouteDestinations(string routeId, Address[] addresses, bool optimalPosition, out string errorString)
+        {
+            return this.AddRouteDestinations(routeId, addresses, optimalPosition, (addressResp, addressNew) =>
+            {
+                return addressResp.AddressString == addressNew.AddressString
+                    && addressResp.Latitude == addressNew.Latitude
+                    && addressResp.Longitude == addressNew.Longitude
+                    && addressResp.RouteDestinationId != null;
+            }, out errorString);
+        }
 
+        /// <summary>
+        /// Add address(es) into a route.
+        /// </summary>
+        /// <param name="routeId"> Route ID </param>
+        /// <param name="addresses"> Valid array of Address objects. </param>
+        /// <param name="errorString"> out: Error as string </param>
+        /// <returns> An array of <see cref="Address"/> objects that were added.</returns>
+        public Address[] AddRouteDestinations(string routeId, Address[] addresses, out string errorString)
+        {
+            return this.AddRouteDestinations(routeId, addresses, optimalPosition: true, errorString: out errorString);
+        }
+       
         public int?[] AddOptimizationDestinations (string optimizationId, Address[] addresses, out string errorString)
         {
             var request = new AddRouteDestinationRequest()
@@ -3689,7 +3703,10 @@ namespace Route4MeSDK
 
 			ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
 
-			HttpClient result = new HttpClient() { BaseAddress = new Uri(url) };
+            HttpClientHandler handler = new HttpClientHandler();
+            handler.Proxy = new WebProxy("127.0.0.1", 8888);
+
+            HttpClient result = new HttpClient(handler) { BaseAddress = new Uri(url) };
 
 			result.Timeout = m_DefaultTimeOut;
 			result.DefaultRequestHeaders.Accept.Clear();
