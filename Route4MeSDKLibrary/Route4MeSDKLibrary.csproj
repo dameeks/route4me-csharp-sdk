@@ -188,7 +188,6 @@
     <None Include="app.config">
       <SubType>Designer</SubType>
     </None>
-    <None Include="BMS-Route4Me-Key.pfx" />
     <None Include="bms_route4me_key.pfx" />
     <None Include="packages.config" />
     <None Include="r4m_csharp_sdk.snk" />
