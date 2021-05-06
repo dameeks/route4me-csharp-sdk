@@ -1,6 +1,8 @@
 ﻿using System.Runtime.Serialization;
 using System.ComponentModel.DataAnnotations;
 using System;
+using Route4MeSDK.QueryTypes;
+using System.ComponentModel;
 
 namespace Route4MeSDK.DataTypes
 {
@@ -8,14 +10,14 @@ namespace Route4MeSDK.DataTypes
     /// Route parameters
     /// </summary>
     [DataContract]
-    public sealed class RouteParameters
+    public class RouteParameters
     {
         /// <summary>
-        /// Let the R4M API know if this SDK request is coming 
+        /// Let the R4M API know if this SDK request is comming 
         /// from a file upload within your environment (for analytics).
         /// </summary>
         [DataMember(Name = "is_upload", EmitDefaultValue = false)]
-        public string IsUpload { get; set; }
+        public bool? IsUpload { get; set; }
 
         /// <summary>
         /// The tour type of this route. rt is short for round trip, 
@@ -57,7 +59,6 @@ namespace Route4MeSDK.DataTypes
         [Obsolete("Always false")]
         [DataMember(Name = "shared_publicly", EmitDefaultValue = false)]
         public string SharedPublicly { get; set; }
-
 
         /// <summary>Gets or sets the optimize parameter.
         /// <para>Availabale values:</para>
@@ -132,13 +133,13 @@ namespace Route4MeSDK.DataTypes
         /// <summary>
         /// Options which let the user choose which road obstacles to avoid. 
         /// This has no impact on route sequencing.
-        /// <para>Available values:
-        /// <value>Highways</value>, 
-        /// <value>Tolls</value>, 
-        /// <value>minimizeHighways</value>, 
-        /// <value>minimizeTolls</value>, 
-        /// <value>""</value>.
-        /// </para>
+        /// <para>Available values:</para>
+        /// <para>- Highways</para>
+        /// <para>- Tolls</para>
+        /// <para>- minimizeHighways</para>
+        /// <para>- minimizeTolls</para>
+        /// <para>- highways,tolls</para>
+        /// <para>- ""</para>.
         /// </summary>
         [DataMember(Name = "avoid", EmitDefaultValue = false)]
         public string Avoid { get; set; }
@@ -183,6 +184,27 @@ namespace Route4MeSDK.DataTypes
         /// <value>The maximum duration of the route.</value>
         [DataMember(Name = "route_max_duration", EmitDefaultValue = false)]
         public long? RouteMaxDuration { get; set; }
+
+        /// <summary>
+        /// The parameter specifies fine-tuning of an optimization process
+        /// by route duration.
+        /// </summary>
+        [DataMember(Name = "target_duration", EmitDefaultValue = false)]
+        public double? TargetDuration { get; set; }
+
+        /// <summary>
+        /// The parameter specifies fine-tuning of an optimization process 
+        /// by route distance.
+        /// </summary>
+        [DataMember(Name = "target_distance", EmitDefaultValue = false)]
+        public double? TargetDistance { get; set; }
+
+        /// <summary>
+        /// The parameter specifies fine-tuning of an optimization process 
+        /// by waiting time.
+        /// </summary>
+        [DataMember(Name = "target_wait_by_tail_size", EmitDefaultValue = false)]
+        public double? WaitingTime { get; set; }
 
         /// <summary>The email address to notify upon completion of an optimization request</summary>
         /// <value>The route email.</value>
@@ -487,16 +509,20 @@ namespace Route4MeSDK.DataTypes
         public int? RightTurn { get; set; }
 
         /// <summary>
-        /// Route travel time slowdown (e.g. 25 (means 25% slowdown))
+        /// Route travel time slowdown (e.g. 25 (means 25% slowdown)).
+        /// Note: the parameter is read-only and it can be set 
+        /// with the parameter Slowdowns.TravelTime.
         /// </summary>
         [DataMember(Name = "route_time_multiplier", EmitDefaultValue = false)]
-        public decimal? RouteTimeMultiplier { get; set; }
+        public int? RouteTimeMultiplier { get; set; }
 
         /// <summary>
-        /// Route service time slowdown (e.g. 10 (means 10% slowdown))
+        /// Route service time slowdown (e.g. 10 (means 10% slowdown)).
+        /// Note: the parameter is read-only and it can be set 
+        /// with the parameter Slowdowns.ServiceTime.
         /// </summary>
         [DataMember(Name = "route_service_time_multiplier", EmitDefaultValue = false)]
-        public decimal? RouteServiceTimeMultiplier { get; set; }
+        public int? RouteServiceTimeMultiplier { get; set; }
 
         /// <summary>
         /// Optimization engine (e.g. '1','2' etc)
@@ -505,11 +531,41 @@ namespace Route4MeSDK.DataTypes
         public string OptimizationEngine { get; set; }
 
         /// <summary>
-        /// If the service time is specified, all the route addresses wil have same service time. 
-        /// See <see cref="OverrideAddresses"/>
+        /// If true, the time windows ignored.
         /// </summary>
-        [DataMember(Name = "override_addresses", EmitDefaultValue = false)]
-        public OverrideAddresses overrideAddresses { get; set; }
+        [DataMember(Name = "ignore_tw", EmitDefaultValue = false)]
+        public bool? IgnoreTw { get; set; }
+
+        /// <summary>
+        /// Slowdown of the optimization parameters.
+        /// </summary>
+        /// <remarks>
+        /// <para>This is only query parameter.</para>
+        /// <para>This parameter is used in the optimization creation/generation process. </para>
+        /// </remarks>
+        [DataMember(Name = "slowdowns", EmitDefaultValue = false)]
+        public SlowdownParams Slowdowns { get; set; }
+
+        /// <summary>
+        /// TO DO: adjust description
+        /// </summary>
+        [DataMember(Name = "is_dynamic_start_time", EmitDefaultValue = false)]
+        [DefaultValue(false)]
+        public bool is_dynamic_start_time { get; set; }
+
+        /// <summary>
+        /// Address bundling rules
+        /// </summary>
+        [DataMember(Name = "bundling", EmitDefaultValue = false)]
+        [DefaultValue(false)]
+        public AddressBundling Bundling { get; set; }
+
+        /// <summary>
+        /// Advanced route constraints
+        /// </summary>
+        [DataMember(Name = "advanced_constraints", EmitDefaultValue = false)]
+        [DefaultValue(false)]
+        public V5.RouteAdvancedConstraints[] AdvancedConstraints { get; set; }
     }
 
     /// <summary>
@@ -522,7 +578,57 @@ namespace Route4MeSDK.DataTypes
         /// </summary>
         [DataMember(Name = "time", EmitDefaultValue = false), CustomValidation(typeof(PropertyValidation), "ValidateEpochTime")]
         public long? Time { get; set; }
+
+        /// <summary>
+        /// Route address stop type
+        /// </summary>
+        [DataMember(Name = "address_stop_type")]
+        public string AddressStopType { get; set; }
+
+        /// <summary>
+        /// The address group
+        /// </summary>
+        [DataMember(Name = "group", EmitDefaultValue = false)]
+        public string Group { get; set; }
     }
 
+    /// <summary>
+    /// Slowdown parameters for the optimization creating process.
+    /// </summary>
+    [DataContract]
+    public class SlowdownParams : GenericParameters
+    {
+        /// <summary>
+        /// Class constructor
+        /// </summary>
+        /// <param name="serviceTime">Service time slowdown (percent)</param>
+        /// <param name="travelTime">Travel time slowdown (percent)</param>
+        public SlowdownParams(int? serviceTime, int? travelTime)
+        {
+            ServiceTime = serviceTime;
+            TravelTime = travelTime;
+        }
 
+        /// <summary>
+        /// Class constructor
+        /// </summary>
+        public SlowdownParams()
+        {
+
+        }
+
+        /// <summary>
+        /// Service time slowdowon (percent)
+        /// </summary>
+        [DataMember(Name = "service_time", EmitDefaultValue = false)]
+        public int? ServiceTime { get; set; }
+
+        /// <summary>
+        /// Travel time slowdowon (percent)
+        /// </summary>
+        [DataMember(Name = "travel_time", EmitDefaultValue = false)]
+        public int? TravelTime { get; set; }
+
+        
+    }
 }

@@ -102,7 +102,7 @@ namespace Route4MeSDK.FastProcessing
         /// <param name="fileName">JSON file name</param>
         public void uploadAndGeocodeLargeJsonFile(string fileName)
         {
-            Route4MeManager route4Me = new Route4MeManager(apiKey);
+            var route4Me = new Route4MeManager(apiKey);
 
             largeJsonFileProcessingIsDone = false;
 
@@ -207,7 +207,7 @@ namespace Route4MeSDK.FastProcessing
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls
             | SecurityProtocolType.Tls11
             | SecurityProtocolType.Tls12
-            | SecurityProtocolType.Ssl3;
+            | (SecurityProtocolType)12288;
 
             geocodedAddressesDownloadingIsDone = false;
 

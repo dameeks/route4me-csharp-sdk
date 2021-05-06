@@ -1,6 +1,5 @@
 ﻿using Route4MeSDK.DataTypes;
 using Route4MeSDK.QueryTypes;
-using System;
 
 namespace Route4MeSDK.Examples
 {
@@ -12,26 +11,15 @@ namespace Route4MeSDK.Examples
         public void GetTerritories()
         {
             // Create the manager with the api key
-            Route4MeManager route4Me = new Route4MeManager(c_ApiKey);
+            var route4Me = new Route4MeManager(ActualApiKey);
 
-            AvoidanceZoneQuery territoryQuery = new AvoidanceZoneQuery();
+            var territoryQuery = new AvoidanceZoneQuery();
 
             // Run the query
-            string errorString = "";
-            AvoidanceZone[] territories = route4Me.GetTerritories(territoryQuery, out errorString);
+            AvoidanceZone[] territories = route4Me.GetTerritories(territoryQuery, 
+                                                                  out string errorString);
 
-            Console.WriteLine("");
-
-            if (territories != null)
-            {
-                Console.WriteLine("GetTerritories executed successfully");
-
-                Console.WriteLine("GetAvoidanceZones executed successfully, {0} territories returned", territories.Length);
-            }
-            else
-            {
-                Console.WriteLine("GetTerritories error: {0}", errorString);
-            }
+            PrintExampleTerritory(territories, errorString);
         }
     }
 }

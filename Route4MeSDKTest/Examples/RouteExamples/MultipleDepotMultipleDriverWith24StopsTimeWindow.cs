@@ -1,19 +1,24 @@
 ﻿using Route4MeSDK.DataTypes;
 using Route4MeSDK.QueryTypes;
 using System;
+using System.Collections.Generic;
 
 namespace Route4MeSDK.Examples
 {
-  public sealed partial class Route4MeExamples
-  {
-    public DataObject MultipleDepotMultipleDriverWith24StopsTimeWindow()
+    public sealed partial class Route4MeExamples
     {
-      // Create the manager with the api key
-      Route4MeManager route4Me = new Route4MeManager(c_ApiKey);
-   
-      // Prepare the addresses
-      Address[] addresses = new Address[]
-      {
+        /// <summary>
+        /// The example refers to the process of creating an optimization 
+        /// with 24 stops and options: multi-depot, multi-driver, time windows options.
+        /// </summary>
+        public void MultipleDepotMultipleDriverWith24StopsTimeWindow()
+        {
+            // Create the manager with the api key
+            var route4Me = new Route4MeManager(ActualApiKey);
+
+            // Prepare the addresses
+            Address[] addresses = new Address[]
+            {
         #region Addresses
 
         new Address() { AddressString   = "3634 W Market St, Fairlawn, OH 44333",
@@ -32,13 +37,7 @@ namespace Route4MeSDK.Examples
                         TimeWindowEnd   = 30529 },
 
         new Address() { AddressString   = "512 Florida Pl, Barberton, OH 44203",
-                        Latitude        = 41.003671512008,
-                        Longitude       = -81.598461046815,
-                        Time            = 300,
-                        TimeWindowStart = 30529,
-                        TimeWindowEnd   = 33479 },
-
-        new Address() { AddressString   = "512 Florida Pl, Barberton, OH 44203",
+                        IsDepot         = true,
                         Latitude        = 41.003671512008,
                         Longitude       = -81.598461046815,
                         Time            = 300,
@@ -186,42 +185,47 @@ namespace Route4MeSDK.Examples
                         TimeWindowEnd   = 68545 }
 
         #endregion
-      };
+            };
 
-      // Set parameters
-      RouteParameters parameters = new RouteParameters()
-      {
-        AlgorithmType = AlgorithmType.CVRP_TW_MD,
-        RouteName     = "Multiple Depot, Multiple Driver with 24 Stops, Time Window",
-        //StoreRoute    = false,
+            // Set parameters
+            var parameters = new RouteParameters()
+            {
+                AlgorithmType = AlgorithmType.CVRP_TW_MD,
+                RouteName = "Multiple Depot, Multiple Driver with 24 Stops, Time Window",
 
-        RouteDate            = R4MeUtils.ConvertToUnixTimestamp(DateTime.UtcNow.Date.AddDays(1)),
-        RouteTime            = 60 * 60 * 7,
-        RouteMaxDuration     = 86400,
-        VehicleCapacity      = 1,
-        VehicleMaxDistanceMI = 10000,
+                RouteDate = R4MeUtils.ConvertToUnixTimestamp(DateTime.UtcNow.Date.AddDays(1)),
+                RouteTime = 60 * 60 * 7,
+                RouteMaxDuration = 86400,
+                VehicleCapacity = 5,
+                VehicleMaxDistanceMI = 10000,
 
-        Optimize     = Optimize.Distance.Description(),
-        DistanceUnit = DistanceUnit.MI.Description(),
-        DeviceType   = DeviceType.Web.Description(),
-        TravelMode   = TravelMode.Driving.Description(),
-        Metric       = Metric.Geodesic
-      };
+                Optimize = Optimize.Distance.Description(),
+                DistanceUnit = DistanceUnit.MI.Description(),
+                DeviceType = DeviceType.Web.Description(),
+                TravelMode = TravelMode.Driving.Description(),
+                Metric = Metric.Matrix
+            };
 
-      OptimizationParameters optimizationParameters = new OptimizationParameters()
-      {
-        Addresses = addresses,
-        Parameters = parameters
-      };
+            var optimizationParameters = new OptimizationParameters()
+            {
+                Addresses = addresses,
+                Parameters = parameters
+            };
 
-      // Run the query
-      string errorString;
-      DataObject dataObject = route4Me.RunOptimization(optimizationParameters, out errorString);
+            // Run the query
+            DataObject dataObject = route4Me.RunOptimization(
+                optimizationParameters,
+                out string errorString);
 
-      // Output the result
-      PrintExampleOptimizationResult("MultipleDepotMultipleDriverWith24StopsTimeWindow", dataObject, errorString);
+            OptimizationsToRemove = new List<string>()
+            {
+                dataObject?.OptimizationProblemId ?? null
+            };
 
-      return dataObject;
+            // Output the result
+            PrintExampleOptimizationResult(dataObject, errorString);
+
+            RemoveTestOptimizations();
+        }
     }
-  }
 }

@@ -1,25 +1,30 @@
 ﻿using Route4MeSDK.DataTypes;
 using Route4MeSDK.QueryTypes;
 using System;
+using System.Collections.Generic;
 
 namespace Route4MeSDK.Examples
 {
-  public sealed partial class Route4MeExamples
-  {
-    public DataObject MultipleDepotMultipleDriver()
+    public sealed partial class Route4MeExamples
     {
-      // Create the manager with the api key
-      Route4MeManager route4Me = new Route4MeManager(c_ApiKey);
-   
-      // Prepare the addresses
-      Address[] addresses = new Address[]
-      {
+        /// <summary>
+        /// The example refers to the process of creating an optimization 
+        /// with multi-depot, multi-driver options.
+        /// </summary>
+        public void MultipleDepotMultipleDriver()
+        {
+            // Create the manager with the api key
+            var route4Me = new Route4MeManager(ActualApiKey);
+
+            // Prepare the addresses
+            var addresses = new Address[]
+            {
         #region Addresses
 
         new Address() { AddressString   = "3634 W Market St, Fairlawn, OH 44333",
                         //all possible originating locations are depots, should be marked as true
                         //stylistically we recommend all depots should be at the top of the destinations list
-                        IsDepot         = true, 
+                        IsDepot         = true,
                         Latitude        = 41.135762259364,
                         Longitude       = -81.629313826561,
                         
@@ -41,18 +46,12 @@ namespace Route4MeSDK.Examples
                         TimeWindowEnd   = 30529},
 
         new Address() { AddressString   = "512 Florida Pl, Barberton, OH 44203",
+                        IsDepot         = true,
                         Latitude        = 41.003671512008,
                         Longitude       = -81.598461046815,
                         Time            = 300,
                         TimeWindowStart = 30529,
                         TimeWindowEnd   = 33779},
-
-        new Address() { AddressString   = "512 Florida Pl, Barberton, OH 44203",
-                        Latitude        = 41.003671512008,
-                        Longitude       = -81.598461046815,
-                        Time            = 100,
-                        TimeWindowStart = 33779,
-                        TimeWindowEnd   = 33944},
 
         new Address() { AddressString   = "3495 Purdue St, Cuyahoga Falls, OH 44221",
                         Latitude        = 41.162971496582,
@@ -88,13 +87,6 @@ namespace Route4MeSDK.Examples
                         Time            = 300,
                         TimeWindowStart = 41617,
                         TimeWindowEnd   = 43660},
-
-        new Address() { AddressString   = "367 Cathy Dr, Munroe Falls, OH 44262",
-                        Latitude        = 41.148578643799,
-                        Longitude       = -81.429229736328,
-                        Time            = 300,
-                        TimeWindowStart = 43660,
-                        TimeWindowEnd   = 46392},
 
         new Address() { AddressString   = "512 Florida Pl, Barberton, OH 44203",
                         Latitude        = 41.003671512008,
@@ -139,49 +131,55 @@ namespace Route4MeSDK.Examples
                         TimeWindowEnd   = 54379}
 
         #endregion
-      };
+            };
 
-      // Set parameters
-      RouteParameters parameters = new RouteParameters()
-      {
-        //specify capacitated vehicle routing with time windows and multiple depots, with multiple drivers
-        AlgorithmType = AlgorithmType.CVRP_TW_MD,
-        
-        //set an arbitrary route name
-        //this value shows up in the website, and all the connected mobile device
-        RouteName     = "Multiple Depot, Multiple Driver",
+            // Set parameters
+            var parameters = new RouteParameters()
+            {
+                //specify capacitated vehicle routing with time windows and multiple depots, with multiple drivers
+                AlgorithmType = AlgorithmType.CVRP_TW_MD,
 
-        //the route start date in UTC, unix timestamp seconds (Tomorrow)
-        RouteDate     = R4MeUtils.ConvertToUnixTimestamp(DateTime.UtcNow.Date.AddDays(1)),
-        //the time in UTC when a route is starting (7AM)
-        RouteTime     = 60 * 60 * 7,
-        
-        //the maximum duration of a route
-        RouteMaxDuration     = 86400,
-        VehicleCapacity      = 1,
-        VehicleMaxDistanceMI = 10000,
+                //set an arbitrary route name
+                //this value shows up in the website, and all the connected mobile device
+                RouteName = "Multiple Depot, Multiple Driver",
 
-        Optimize     = Optimize.Distance.Description(),
-        DistanceUnit = DistanceUnit.MI.Description(),
-        DeviceType   = DeviceType.Web.Description(),
-        TravelMode   = TravelMode.Driving.Description(),
-        Metric       = Metric.Geodesic
-      };
+                //the route start date in UTC, unix timestamp seconds (Tomorrow)
+                RouteDate = R4MeUtils.ConvertToUnixTimestamp(DateTime.UtcNow.Date.AddDays(1)),
+                //the time in UTC when a route is starting (7AM)
+                RouteTime = 60 * 60 * 7,
 
-      OptimizationParameters optimizationParameters = new OptimizationParameters()
-      {
-        Addresses = addresses,
-        Parameters = parameters
-      };
+                //the maximum duration of a route
+                RouteMaxDuration = 86400,
+                VehicleCapacity = 5,
+                VehicleMaxDistanceMI = 10000,
 
-      // Run the query
-      string errorString;
-      DataObject dataObject = route4Me.RunOptimization(optimizationParameters, out errorString);
+                Optimize = Optimize.Distance.Description(),
+                DistanceUnit = DistanceUnit.MI.Description(),
+                DeviceType = DeviceType.Web.Description(),
+                TravelMode = TravelMode.Driving.Description(),
+                Metric = Metric.Matrix
+            };
 
-      // Output the result
-      PrintExampleOptimizationResult("MultipleDepotMultipleDriver", dataObject, errorString);
+            var optimizationParameters = new OptimizationParameters()
+            {
+                Addresses = addresses,
+                Parameters = parameters
+            };
 
-      return dataObject;
+            // Run the query
+            DataObject dataObject = route4Me.RunOptimization(
+                                        optimizationParameters, 
+                                        out string errorString);
+
+            OptimizationsToRemove = new List<string>()
+            {
+                dataObject?.OptimizationProblemId ?? null
+            };
+
+            // Output the result
+            PrintExampleOptimizationResult(dataObject, errorString);
+
+            RemoveTestOptimizations();
+        }
     }
-  }
 }

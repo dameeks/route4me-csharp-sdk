@@ -33,6 +33,7 @@ namespace Route4MeSDK
 		private readonly TimeSpan m_DefaultTimeOut = new TimeSpan(TimeSpan.TicksPerMinute * 30); // Default timeout - 30 minutes
 																								 //private bool m_isTestMode = false;
 
+		private bool parseWithNewtonJson;
 		#endregion
 
 		#region Methods
@@ -42,6 +43,7 @@ namespace Route4MeSDK
 		public Route4MeManager(string apiKey)
 		{
 			m_ApiKey = apiKey;
+            parseWithNewtonJson = false;
 		}
 
         #endregion
@@ -142,9 +144,9 @@ namespace Route4MeSDK
         /// <summary>
         /// Updates an existing optimization problem
         /// </summary>
-        /// <param name="optimizationParameters"></param>
-        /// <param name="errorString"></param>
-        /// <returns></returns>
+        /// <param name="optimizationParameters">Parameters for updating an optimization</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Updated optimization</returns>
 		public DataObject UpdateOptimization(OptimizationParameters optimizationParameters, out string errorString)
 		{
 			var result = GetJsonObjectFromAPI<DataObject>(optimizationParameters,
@@ -194,13 +196,13 @@ namespace Route4MeSDK
         /// <returns> Result status true/false </returns>
         public bool RemoveOptimization(string[] optimizationProblemIDs, out string errorString)
 		{
-			RemoveOptimizationRequest remParameters = new RemoveOptimizationRequest()
+			var remParameters = new RemoveOptimizationRequest()
 			{
 				redirect = 0,
 				optimization_problem_ids = optimizationProblemIDs
 			};
 
-			RemoveOptimizationResponse response = GetJsonObjectFromAPI<RemoveOptimizationResponse>(remParameters,
+			var response = GetJsonObjectFromAPI<RemoveOptimizationResponse>(remParameters,
 																 R4MEInfrastructureSettings.ApiHost,
 																 HttpMethodType.Delete,
 																 out errorString);
@@ -240,10 +242,11 @@ namespace Route4MeSDK
         /// <returns>True if  destination as removed from an optimization, otherwise - false</returns>
 		public bool RemoveDestinationFromOptimization(string optimizationId, int destinationId, out string errorString)
 		{
-			GenericParameters genericParameters = new GenericParameters();
+			var genericParameters = new GenericParameters();
 			genericParameters.ParametersCollection.Add("optimization_problem_id", optimizationId);
 			genericParameters.ParametersCollection.Add("route_destination_id", destinationId.ToString());
-			RemoveDestinationFromOptimizationResponse response = GetJsonObjectFromAPI<RemoveDestinationFromOptimizationResponse>(genericParameters,
+
+			var response = GetJsonObjectFromAPI<RemoveDestinationFromOptimizationResponse>(genericParameters,
 																   R4MEInfrastructureSettings.GetAddress,
 																   HttpMethodType.Delete,
 																   out errorString);
@@ -306,8 +309,35 @@ namespace Route4MeSDK
 														  HttpMethodType.Get,
 														  out errorString);
 
+            #region Shift the route date and route time to make them as shown in the web app.
+
+            if (result!=null && result.GetType()==typeof(DataObjectRoute) && routeParameters.ShiftByTimeZone)
+            {
+                result = ShiftRouteDateTimeByTz(result);
+            }
+
+            #endregion
+
 			return result;
 		}
+
+        /// <summary>
+        /// Shift the route date and route time to make them as shown in the web app.
+        /// </summary>
+        /// <param name="route">Input route object</param>
+        /// <returns>Modified route object</returns>
+        public DataObjectRoute ShiftRouteDateTimeByTz(DataObjectRoute route)
+        {
+            var tz = R4MeUtils.GetLocalTimeZone();
+            long totalTime = (long)(route.Parameters.RouteDate + route.Parameters.RouteTime);
+
+            totalTime += tz;
+
+            route.Parameters.RouteDate = (totalTime / 86400) * 86400;
+            route.Parameters.RouteTime = (int)(totalTime - route.Parameters.RouteDate);
+
+            return route;
+        }
 
         /// <summary>
         /// Returns array of the routes limited by the parameters: offset and limit.
@@ -322,22 +352,33 @@ namespace Route4MeSDK
 																 HttpMethodType.Get,
 																 out errorString);
 
+            if (result != null && result.GetType() == typeof(DataObjectRoute[]) && routeParameters.ShiftByTimeZone)
+            {
+                List<DataObjectRoute> lsRoutes = new List<DataObjectRoute>();
+
+                foreach (DataObjectRoute route in result)
+                {
+                    lsRoutes.Add(ShiftRouteDateTimeByTz(route));
+                }
+                
+            }
+
 			return result;
 		}
 
         /// <summary>
         /// Returns a route ID from the first route of an optimization
         /// </summary>
-        /// <param name="optimizationProblemId"></param>
+        /// <param name="optimizationProblemId">Optimization problem ID</param>
         /// <param name="errorString">Returned error string in case of the processs failing</param>
         /// <returns>A route ID</returns>
 		public string GetRouteId(string optimizationProblemId, out string errorString)
 		{
-			GenericParameters genericParameters = new GenericParameters();
+			var genericParameters = new GenericParameters();
 			genericParameters.ParametersCollection.Add("optimization_problem_id", optimizationProblemId);
 			genericParameters.ParametersCollection.Add("wait_for_final_state", "1");
 
-			DataObject response = GetJsonObjectFromAPI<DataObject>(genericParameters,
+			var response = GetJsonObjectFromAPI<DataObject>(genericParameters,
 																   R4MEInfrastructureSettings.ApiHost,
 																   HttpMethodType.Get,
 																   out errorString);
@@ -354,39 +395,286 @@ namespace Route4MeSDK
         /// <returns>A route</returns>
 		public DataObjectRoute UpdateRoute(RouteParametersQuery routeParameters, out string errorString)
 		{
+            if ((routeParameters.Parameters?.Metric ?? null) == 0) routeParameters.Parameters.Metric = Metric.Matrix;
+
+
 			var result = GetJsonObjectFromAPI<DataObjectRoute>(routeParameters,
 														  R4MEInfrastructureSettings.RouteHost,
 														  HttpMethodType.Put,
 														  out errorString);
 
+            if (result != null && result.GetType() == typeof(DataObjectRoute) && routeParameters.ShiftByTimeZone)
+            {
+                result = ShiftRouteDateTimeByTz(result);
+            }
+
 			return result;
 		}
+
+        private DataObjectRoute RemoveDuplicatedAddressesFromRoute(DataObjectRoute route, bool ShiftByTimeZone = false)
+        {
+            var lsAddress = new List<Address>();
+
+            foreach (var addr1 in route.Addresses)
+            {
+                if (!lsAddress.Contains(addr1) && 
+                    lsAddress
+                    .Where(x => x.RouteDestinationId==addr1.RouteDestinationId)
+                    .FirstOrDefault()==null) lsAddress.Add(addr1);
+            }
+
+            route.Addresses = lsAddress.ToArray();
+
+            if (route != null && route.GetType() == typeof(DataObjectRoute) && ShiftByTimeZone)
+            {
+                route = ShiftRouteDateTimeByTz(route);
+            }
+
+            return route;
+        }
 
         /// <summary>
         /// Update route by changed DataObjectRoute object directly.
         /// </summary>
-        /// <param name="route">A route of the DataObjectRoute type as input parameters.</param>
+        /// <param name="route">A route of the DataObjectRoute type as input parameters.
+        /// Note: or adding new note to the account, corresponding object address note should have NoteId=-1</param>
+        /// <param name="initialRoute">An initial route before update.</param>
         /// <param name="errorString">Returned error string in case of the processs failing</param>
         /// <returns>Updated route</returns>
-        public DataObjectRoute UpdateRoute(DataObjectRoute route, out string errorString)
+        public DataObjectRoute UpdateRoute(DataObjectRoute route, DataObjectRoute initialRoute, out string errorString)
         {
+            errorString = "";
+            parseWithNewtonJson = true;
             
-            var routeParameters = new RouteParametersQuery()
+            if (initialRoute==null)
             {
-                RouteId = route.RouteID,
-                ApprovedForExecution = route.ApprovedForExecution,
-                Parameters = route.Parameters,
-                Addresses = route.Addresses
+                errorString = "An initial route should be specified";
+                return null;
+            }
+
+            route = RemoveDuplicatedAddressesFromRoute(route);
+            initialRoute = RemoveDuplicatedAddressesFromRoute(initialRoute);
+
+            #region // ApprovedForExecution
+            string approvedForExecution = "";
+
+            if (initialRoute.ApprovedForExecution != route.ApprovedForExecution)
+            {
+                approvedForExecution = String.Concat("{\"approved_for_execution\": ", route.ApprovedForExecution ? "true" : "false", "}");
+                
+                var genParams = new RouteParametersQuery()
+                {
+                    RouteId = initialRoute.RouteID
             };
 
-            routeParameters.PrepareForSerialization();
+                var content = new StringContent(approvedForExecution, System.Text.Encoding.UTF8, "application/json");
 
-            var result = GetJsonObjectFromAPI<DataObjectRoute>(routeParameters,
-                                                          R4MEInfrastructureSettings.RouteHost,
-                                                          HttpMethodType.Put,
-                                                          out errorString);
+                initialRoute = GetJsonObjectFromAPI<DataObjectRoute>
+                        (genParams, R4MEInfrastructureSettings.RouteHost,
+                        HttpMethodType.Put, content, out errorString);
 
-            return result;
+                if (initialRoute == null) return null;
+            }
+
+            #endregion
+
+            #region // Resequence if sequence was changed
+            string resequenceJson = "";
+
+            foreach (var addr1 in initialRoute.Addresses)
+            {
+                var addr = route.Addresses.Where(x => x.RouteDestinationId == addr1.RouteDestinationId).FirstOrDefault();
+
+                if (addr1!=null && (addr.SequenceNo != addr1.SequenceNo || addr.IsDepot != addr1.IsDepot))
+                {
+                    resequenceJson += "{\"route_destination_id\":" + addr1.RouteDestinationId;
+
+                    if (addr.SequenceNo != addr1.SequenceNo)
+                    {
+                        resequenceJson += "," + "\"sequence_no\":" + addr.SequenceNo;
+                    }
+                    else if(addr.IsDepot != addr1.IsDepot)
+                    {
+                        resequenceJson += "," + "\"is_depot\":" + addr.IsDepot.ToString().ToLower();
+                    }
+
+                    resequenceJson += "},";
+                }
+            }
+
+            if (resequenceJson.Length>10)
+            {
+                resequenceJson = resequenceJson.TrimEnd(',');
+                resequenceJson = "{\"addresses\": [" + resequenceJson + "]}";
+
+                var genParams = new RouteParametersQuery()
+                {
+                    RouteId = initialRoute.RouteID
+                };
+
+                var content = new StringContent(resequenceJson, System.Text.Encoding.UTF8, "application/json");
+
+                initialRoute = GetJsonObjectFromAPI<DataObjectRoute>
+                        (genParams, R4MEInfrastructureSettings.RouteHost,
+                        HttpMethodType.Put, content, out errorString);
+
+                if (initialRoute == null) return null;
+            }
+ 
+            #endregion
+
+            #region // Update Route Parameters
+
+            if ((route?.Parameters ?? null) != null)
+            {
+                var updatableRouteParametersProperties = R4MeUtils
+                    .GetPropertiesWithDifferentValues(route.Parameters, initialRoute.Parameters, out errorString);
+
+                if (updatableRouteParametersProperties!=null && updatableRouteParametersProperties.Count>0)
+                {
+                    var dynamicRouteProperties = new Route4MeDynamicClass();
+
+                    dynamicRouteProperties.CopyPropertiesFromClass(route.Parameters, updatableRouteParametersProperties, out string errorString0);
+
+                    var routeParamsJsonString = R4MeUtils.SerializeObjectToJson(dynamicRouteProperties.DynamicProperties, true);
+
+                    routeParamsJsonString = String.Concat("{\"parameters\":", routeParamsJsonString, "}");
+
+                    var genParams = new RouteParametersQuery()
+                    {
+                        RouteId = initialRoute.RouteID
+                    };
+
+                    var content = new StringContent(routeParamsJsonString, System.Text.Encoding.UTF8, "application/json");
+
+                    initialRoute = GetJsonObjectFromAPI<DataObjectRoute>
+                        (genParams, R4MEInfrastructureSettings.RouteHost,
+                        HttpMethodType.Put, content, out errorString);
+                }
+            }
+
+            #endregion
+
+            if (initialRoute == null) return null;
+
+             #region // Update Route Addresses
+
+            var lsUpdatedAddresses = new List<Address>();
+
+            if ((route?.Addresses ?? null) != null && route.Addresses.Length>0)
+            {
+                foreach (var address in route.Addresses)
+                {
+                    var initialAddress = initialRoute.Addresses
+                        .Where(x => x.RouteDestinationId == address.RouteDestinationId)
+                        .FirstOrDefault();
+
+                    if (initialAddress==null)
+                    {
+                        initialAddress = initialRoute.Addresses
+                        .Where(x => x.AddressString == address.AddressString)
+                        .FirstOrDefault();
+                    }
+                    
+                    if (initialAddress == null) continue;
+                    
+                    var updatableAddressProperties = R4MeUtils
+                    .GetPropertiesWithDifferentValues(address, initialAddress, out errorString);
+
+                    if (updatableAddressProperties.Contains("IsDepot")) updatableAddressProperties.Remove("IsDepot");
+                    if (updatableAddressProperties.Contains("SequenceNo")) updatableAddressProperties.Remove("SequenceNo");
+                    if (updatableAddressProperties.Contains("OptimizationProblemId") 
+                        && updatableAddressProperties.Count==1) updatableAddressProperties.Remove("OptimizationProblemId");
+
+                    if (updatableAddressProperties != null && updatableAddressProperties.Count>0)
+                    {
+                        var dynamicAddressProperties = new Route4MeDynamicClass();
+
+                        dynamicAddressProperties.CopyPropertiesFromClass(address, updatableAddressProperties, out string errorString0);
+
+                        var addressParamsJsonString = R4MeUtils.SerializeObjectToJson(dynamicAddressProperties.DynamicProperties, true);
+
+                        var genParams = new RouteParametersQuery()
+                        {
+                            RouteId = initialRoute.RouteID,
+                            RouteDestinationId = address.RouteDestinationId
+                        };
+
+                        var content = new StringContent(addressParamsJsonString, System.Text.Encoding.UTF8, "application/json");
+
+                        var updatedAddress = GetJsonObjectFromAPI<Address>
+                            (genParams, R4MEInfrastructureSettings.GetAddress,
+                            HttpMethodType.Put, content, out errorString);
+
+                        updatedAddress.IsDepot = initialAddress.IsDepot;
+                        updatedAddress.SequenceNo = initialAddress.SequenceNo;
+
+                        if ((address?.Notes?.Length ?? -1) > 0)
+                        {
+                            var addressNotes = new List<AddressNote>();
+
+                            foreach (AddressNote note1 in address.Notes)
+                            {
+                                if ((note1?.NoteId ?? null) == -1 )
+                                {
+                                    var noteParameters = new NoteParameters()
+                                    {
+                                        RouteId = initialRoute.RouteID,
+                                        AddressId = updatedAddress.RouteDestinationId != null ? (int)updatedAddress.RouteDestinationId : note1.RouteDestinationId,
+                                        Latitude = note1.Latitude,
+                                        Longitude = note1.Longitude
+                                    };
+
+                                    if (note1.ActivityType != null) noteParameters.ActivityType = note1.ActivityType;
+                                    if (note1.DeviceType != null) noteParameters.DeviceType = note1.DeviceType;
+
+                                    string noteContent = note1.Contents != null ? note1.Contents : null;
+
+                                    if (noteContent != null) noteParameters.StrNoteContents = noteContent;
+
+                                    Dictionary<string, string> customNotes = null;
+
+                                    if ((note1?.CustomTypes?.Length ?? -1)>0)
+                                    {
+                                        customNotes = new Dictionary<string, string>();
+
+                                        foreach (AddressCustomNote customNote in note1.CustomTypes)
+                                        {
+                                            customNotes.Add("custom_note_type[" + customNote.NoteCustomTypeID + "]", customNote.NoteCustomValue);
+                                        }
+        }
+
+                                    if (customNotes != null) noteParameters.CustomNoteTypes = customNotes;
+
+                                    if (note1.UploadUrl != null) noteParameters.StrFileName = note1.UploadUrl;
+
+                                    AddressNote addedNote = AddAddressNote(noteParameters, out string errorString3);
+                                    if (errorString3 != "") errorString += "\nNote Adding Error: " + errorString3;
+
+                                    if (addedNote != null) addressNotes.Add(addedNote);
+                                }
+                                else
+                                {
+                                    addressNotes.Add(note1);
+                                }
+                            }
+
+                            address.Notes = addressNotes.ToArray();
+                            updatedAddress.Notes = addressNotes.ToArray();
+                        }
+
+                        if (updatedAddress != null && updatedAddress.GetType() == typeof(Address))
+                        {
+                            int addressIndex = Array.IndexOf(initialRoute.Addresses, initialAddress);
+                            if (addressIndex>-1) initialRoute.Addresses[addressIndex] = updatedAddress;
+                        }
+                    }
+                }
+            }
+
+            #endregion
+
+            return initialRoute;
         }
 
         /// <summary>
@@ -413,15 +701,23 @@ namespace Route4MeSDK
 		public string DuplicateRoute(RouteParametersQuery queryParameters, out string errorString)
 		{
 			queryParameters.ParametersCollection["to"] = "none";
-			DuplicateRouteResponse response = GetJsonObjectFromAPI<DuplicateRouteResponse>(queryParameters,
+			var response = GetJsonObjectFromAPI<DuplicateRouteResponse>(queryParameters,
 																   R4MEInfrastructureSettings.DuplicateRoute,
 																   HttpMethodType.Get,
 																   out errorString);
 
-            return (response != null && response.Success) 
+            //return (response != null && response.Success) 
+            //    ? (response.OptimizationProblemId != null 
+            //      ? this.GetRouteId(response.OptimizationProblemId, out errorString) : null)
+            //    : null;
+
+            // TO DO: response.OptimizationProblemId in fact is route ID - it's bug. Inform Igor, after fixing restore above code.
+            var routeId = (response != null && response.Success)
                 ? (response.OptimizationProblemId != null 
-                  ? this.GetRouteId(response.OptimizationProblemId, out errorString) : null)
+                  ? response.OptimizationProblemId : null)
                 : null;
+
+            return routeId;
 		}
 
         /// <summary>
@@ -463,10 +759,11 @@ namespace Route4MeSDK
 				str_route_ids += routeId;
 			}
 
-			GenericParameters genericParameters = new GenericParameters();
+			var genericParameters = new GenericParameters();
 
 			genericParameters.ParametersCollection.Add("route_id", str_route_ids);
-			DeleteRouteResponse response = GetJsonObjectFromAPI<DeleteRouteResponse>(genericParameters,
+
+			var response = GetJsonObjectFromAPI<DeleteRouteResponse>(genericParameters,
 																   R4MEInfrastructureSettings.RouteHost,
 																   HttpMethodType.Delete,
 																   out errorString);
@@ -488,45 +785,78 @@ namespace Route4MeSDK
         /// <returns>True if the routes were merged successfuly</returns>
 		public bool MergeRoutes(MergeRoutesQuery mergeRoutesParameters, out string errorString)
 		{
-			GenericParameters roParames = new GenericParameters();
+			var roParames = new GenericParameters();
 
-			List<KeyValuePair<string, string>> keyValues = new List<KeyValuePair<string, string>>()
+			var keyValues = new List<KeyValuePair<string, string>>()
             {
                 new KeyValuePair<string, string>("route_ids", mergeRoutesParameters.RouteIds),
                 new KeyValuePair<string, string>("depot_address", mergeRoutesParameters.DepotAddress),
                 new KeyValuePair<string, string>("remove_origin", mergeRoutesParameters.RemoveOrigin.ToString()),
                 new KeyValuePair<string, string>("depot_lat", mergeRoutesParameters.DepotLat.ToString()),
-                new KeyValuePair<string, string>("depot_lng", mergeRoutesParameters.DepotLng.ToString())
+                new KeyValuePair<string, string>("depot_lng", mergeRoutesParameters.DepotLng.ToString()),
+                new KeyValuePair<string, string>("to_route_id", mergeRoutesParameters.ToRouteId.ToString()),
+                new KeyValuePair<string, string>("route_destination_id", mergeRoutesParameters.RouteDestinationId.ToString())
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
 			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>
 				(roParames, R4MEInfrastructureSettings.MergeRoutes,
 				HttpMethodType.Post, httpContent, out errorString);
 
 			return (response != null && response.status) ? true : false;
+            };
 		}
 
         /// <summary>
         /// Resequences/roptimizes a route. TO DO: this endpoint seems to be deprecated and should be disabled
         /// </summary>
-        /// <param name="roParames"></param>
-        /// <param name="errorString"></param>
-        /// <returns></returns>
+        /// <param name="roParames">The parameters for reoptimizng</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>True, if a route reoptimized/resequences successfully</returns>
+        /// 
+		[Obsolete("The method is obsolete, use the method ReoptimizeRoute instead.")]
 		public bool ResequenceReoptimizeRoute(Dictionary<string, string> roParames, out string errorString)
 		{
-			RouteParametersQuery request = new RouteParametersQuery
+			var request = new RouteParametersQuery
 			{
 				RouteId = roParames["route_id"],
 				DisableOptimization = roParames["disable_optimization"] == "1" ? true : false,
 				Optimize = roParames["optimize"]
 			};
 
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(request, R4MEInfrastructureSettings.RouteReoptimize, HttpMethodType.Get, out errorString);
+			var response = GetJsonObjectFromAPI<StatusResponse>(
+                request, 
+                R4MEInfrastructureSettings.RouteReoptimize, 
+                HttpMethodType.Get, 
+                out errorString);
 
 			return (response != null && response.status) ? true : false;
 		}
+
+        /// <summary>
+        /// Reoptimze a route
+        /// </summary>
+        /// <param name="queryParams">Route query parameters containing parameters:
+        /// <para>ReOptimize = true, enables reoptimization of a route</para>
+        /// <para>Remaining=0 - disables resequencing of the remaining stops. </para>
+        /// <para>Remaining=1 - enables resequencing of the remaining stops. </para></param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Reoptimized route</returns>
+        public DataObjectRoute ReoptimizeRoute(RouteParametersQuery queryParams, out string errorString)
+        {
+            var result = GetJsonObjectFromAPI<DataObjectRoute>(queryParams,
+                                            R4MEInfrastructureSettings.RouteHost,
+                                            HttpMethodType.Put,
+                                            out errorString);
+
+            if (result != null && result.GetType() == typeof(DataObjectRoute) && queryParams.ShiftByTimeZone)
+            {
+                result = ShiftRouteDateTimeByTz(result);
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// The request parameters for manually resequencing of a route
@@ -571,19 +901,18 @@ namespace Route4MeSDK
         /// <returns>A re-sequenced route</returns>
         public DataObjectRoute ManuallyResequenceRoute(RouteParametersQuery rParams, Address[] addresses, out string errorString)
 		{
-			ManuallyResequenceRouteRequest request = new ManuallyResequenceRouteRequest()
+			var request = new ManuallyResequenceRouteRequest()
 			{
 				RouteId = rParams.RouteId,
-
 			};
 
-			List<AddressInfo> lsAddresses = new List<AddressInfo>();
+			var lsAddresses = new List<AddressInfo>();
 
 			int iMaxSequenceNumber = 0;
 
 			foreach (var address in addresses)
 			{
-				AddressInfo aInfo = new AddressInfo()
+				var aInfo = new AddressInfo()
 				{
 					DestinationId = address.RouteDestinationId != null ? (int)address.RouteDestinationId : -1,
 					SequenceNo = address.SequenceNo != null ? (int)address.SequenceNo : iMaxSequenceNumber
@@ -596,10 +925,15 @@ namespace Route4MeSDK
 
 			request.Addresses = lsAddresses.ToArray();
 
-			DataObjectRoute route1 = GetJsonObjectFromAPI<DataObjectRoute>(request,
+			var route1 = GetJsonObjectFromAPI<DataObjectRoute>(request,
 											R4MEInfrastructureSettings.RouteHost,
 											HttpMethodType.Put,
 											out errorString);
+
+            if (route1 != null && route1.GetType() == typeof(DataObjectRoute) && rParams.ShiftByTimeZone)
+            {
+                route1 = ShiftRouteDateTimeByTz(route1);
+            }
 
 			return route1;
 		}
@@ -616,14 +950,22 @@ namespace Route4MeSDK
         /// <returns>True if a route was shared</returns>
 		public bool RouteSharing(RouteParametersQuery roParames, string Email, out string errorString)
 		{
-			List<KeyValuePair<string, string>> keyValues = new List<KeyValuePair<string, string>>();
+            var keyValues = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("recipient_email", Email)
+            };
 
-			keyValues.Add(new KeyValuePair<string, string>("recipient_email", Email));
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(roParames, R4MEInfrastructureSettings.RouteSharing, HttpMethodType.Post, httpContent, out errorString);
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                var response = GetJsonObjectFromAPI<StatusResponse>(
+                    roParames, 
+                    R4MEInfrastructureSettings.RouteSharing, 
+                    HttpMethodType.Post, 
+                    httpContent, 
+                    out errorString);
 
 			return (response != null && response.status) ? true : false;
+            };
 		}
 
         /// <summary>
@@ -657,7 +999,7 @@ namespace Route4MeSDK
         /// <returns>Updated route destination</returns>
 		public Address UpdateRouteCustomData(RouteParametersQuery routeParameters, Dictionary<string, string> customData, out string errorString)
 		{
-			UpdateRouteCustomDataRequest request = new UpdateRouteCustomDataRequest
+			var request = new UpdateRouteCustomDataRequest
 			{
 				RouteId = routeParameters.RouteId,
 				RouteDestinationId = routeParameters.RouteDestinationId,
@@ -684,169 +1026,7 @@ namespace Route4MeSDK
             /// <value>A route destination ID to be updated</value>
 			[HttpQueryMemberAttribute(Name = "route_destination_id", EmitDefaultValue = false)]
 			public int? RouteDestinationId { get; set; }
-            /*
-            /// <value>The route destination alias</value>
-			[DataMember(Name = "alias", EmitDefaultValue = false)]
-			public string Alias { get; set; }
-
-            /// <value>The first name of a person at the destination</value>
-			[DataMember(Name = "first_name", EmitDefaultValue = false)]
-			public string FirstName { get; set; }
-
-            /// <value>The first name of a person at the destination</value>
-			[DataMember(Name = "last_name", EmitDefaultValue = false)]
-			public string LastName { get; set; }
-
-            /// <value>The destination's address</value>
-			[DataMember(Name = "address", EmitDefaultValue = false)]
-			public string AddressString { get; set; }
-
-            /// <value>The address stop type</value>
-			[DataMember(Name = "address_stop_type", EmitDefaultValue = false)]
-			public string AddressStopType { get; set; }
-
-            /// <value>If true the destination is a depot</value>
-			[DataMember(Name = "is_depot", EmitDefaultValue = false)]
-			public bool? IsDepot { get; set; }
-
-            /// <value>the latitude of the address</value>
-            [DataMember(Name = "lat", EmitDefaultValue = false)]
-			public double Latitude { get; set; }
-
-            /// <value>the longitude of the address</value>
-            [DataMember(Name = "lng", EmitDefaultValue = false)]
-			public double Longitude { get; set; }
-
-            /// <value>the sequence number of the address</value>
-			[DataMember(Name = "sequence_no", EmitDefaultValue = false)]
-			public int? SequenceNo { get; set; }
-
-            /// <value>status flag to mark an address as visited (aka check in)</value>
-            [DataMember(Name = "is_visited", EmitDefaultValue = false)]
-			public bool? IsVisited { get; set; }
-
-            /// <value>status flag to mark an address as departed (aka check out)</value>
-            [DataMember(Name = "is_departed", EmitDefaultValue = false)]
-			public bool? IsDeparted { get; set; }
-
-            /// <value>the last known visited timestamp of this address</value>
-            [DataMember(Name = "timestamp_last_visited", EmitDefaultValue = false)]
-			public uint? TimestampLastVisited { get; set; }
-
-            /// <value>The last known departed timestamp of this address</value>
-            [DataMember(Name = "timestamp_last_departed", EmitDefaultValue = false)]
-			public uint? TimestampLastDeparted { get; set; }
-
-            /// <value>the address group</value>
-			[DataMember(Name = "group", EmitDefaultValue = false)]
-			public object Group { get; set; }
-
-            //pass-through data about this route destination
-            //the data will be visible on the manifest, website, and mobile apps
-            /// <value>The customer PO of the address</value>
-            [DataMember(Name = "customer_po", EmitDefaultValue = false)]
-			public object CustomerPo { get; set; }
-
-            //pass-through data about this route destination
-            //the data will be visible on the manifest, website, and mobile apps
-            /// <value>The invoice NO of the address</value>
-            [DataMember(Name = "invoice_no", EmitDefaultValue = false)]
-			public object InvoiceNo { get; set; }
-
-            //pass-through data about this route destination
-            //the data will be visible on the manifest, website, and mobile apps
-            /// <value>The reference NO of the address</value>
-            [DataMember(Name = "reference_no", EmitDefaultValue = false)]
-			public object ReferenceNo { get; set; }
-
-            //pass-through data about this route destination
-            //the data will be visible on the manifest, website, and mobile apps
-            /// <value>The order NO of the address</value>
-            [DataMember(Name = "order_no", EmitDefaultValue = false)]
-			public object OrderNo { get; set; }
-
-            /// <value>The order ID of the address</value>
-			[DataMember(Name = "order_id", EmitDefaultValue = false)]
-			public int? OrderId { get; set; }
-
-            /// <value>The weight of the cargo</value>
-			[DataMember(Name = "weight", EmitDefaultValue = false)]
-			public object Weight { get; set; }
-
-            /// <value>The cost of the address</value>
-			[DataMember(Name = "cost", EmitDefaultValue = false)]
-			public object Cost { get; set; }
-
-            /// <value>The revenue from the address</value>
-			[DataMember(Name = "revenue", EmitDefaultValue = false)]
-			public object Revenue { get; set; }
-
-            //the cubic volume that this destination/order/line-item consumes/contains
-            //this is how much space it will take up on a vehicle
-            /// <value>The cubic volume of the cargo</value>
-            [DataMember(Name = "cube", EmitDefaultValue = false)]
-			public object Cube { get; set; }
-
-            //the number of pieces/palllets that this destination/order/line-item consumes/contains on a vehicle
-            /// <value>Number of pieces for an address</value>
-            [DataMember(Name = "pieces", EmitDefaultValue = false)]
-			public object Pieces { get; set; }
-
-            /// <value>The address email</value>
-			[DataMember(Name = "email", EmitDefaultValue = false)]
-			public string Email { get; set; }
-
-            /// <value>The address phone</value>
-			[DataMember(Name = "phone", EmitDefaultValue = false)]
-			public string Phone { get; set; }
-
-            /// <value>The time window start</value>
-			[DataMember(Name = "time_window_start", EmitDefaultValue = false)]
-			public long? TimeWindowStart { get; set; }
-
-            /// <value>The time window end</value>
-			[DataMember(Name = "time_window_end", EmitDefaultValue = false)]
-			public long? TimeWindowEnd { get; set; }
-
-            // <value>The expected amount of time that will be spent at this address by the driver/user</value>
-            [DataMember(Name = "time", EmitDefaultValue = false)]
-			public long? Time { get; set; }
-
-            //if present, the priority will sequence addresses in all the optimal routes so that
-            //higher priority addresses are general at the beginning of the route sequence
-            //1 is the highest priority, 100000 is the lowest
-            /// <value>The priority level of an address</value>
-            [DataMember(Name = "priority", EmitDefaultValue = false)]
-			public int? Priority { get; set; }
-
-            //generate optimal routes and driving directions to this curbside lat
-            /// <value>The curbside latitude</value>
-            [DataMember(Name = "curbside_lat", EmitDefaultValue = false)]
-			public double? CurbsideLatitude { get; set; }
-
-            //generate optimal routes and driving directions to the curbside lang
-            /// <value>The curbside longitude</value>
-            [DataMember(Name = "curbside_lng", EmitDefaultValue = false)]
-			public double? CurbsideLongitude { get; set; }
-
-            /// <value>The time window start 2</value>
-			[DataMember(Name = "time_window_start_2", EmitDefaultValue = false)]
-			public long? TimeWindowStart2 { get; set; }
-
-            /// <value>The time window end 2</value>
-			[DataMember(Name = "time_window_end_2", EmitDefaultValue = false)]
-			public long? TimeWindowEnd2 { get; set; }
-
-            /// <value>The custom fields of an address</value>
-			[DataMember(Name = "custom_fields", EmitDefaultValue = false)]
-			public Dictionary<string, string> CustomFields { get; set; }
-
-            /// <value>The person's contact ID at an address</value>
-			[DataMember(Name = "contact_id", EmitDefaultValue = false)]
-			public int? ContactId { get; set; }
-            */
 		}
-
 
         /// <summary>
         /// Updated a route destination
@@ -856,15 +1036,6 @@ namespace Route4MeSDK
         /// <returns>The updated address</returns>
 		public Address UpdateRouteDestination(Address addressParameters, out string errorString)
 		{
-            
-            //string[] addressProperties = new string[]
-            //    {"Alias","FirstName","LastName","AddressString","AddressStopType","IsDepot","Latitude",
-            //        "Longitude","SequenceNo","IsVisited","IsDeparted","TimestampLastVisited",
-            //        "TimestampLastDeparted","Group","CustomerPo","InvoiceNo","ReferenceNo","OrderNo",
-            //        "OrderId","Weight","Cost","Revenue","Cube","Pieces","Phone","TimeWindowStart",
-            //        "TimeWindowEnd","Priority","CurbsideLatitude","CurbsideLongitude","TimeWindowStart2",
-            //        "TimeWindowEnd2","CustomFields","ContactId" };
-
 			var request = new UpdateRouteDestinationRequest
 			{
 				RouteId = addressParameters.RouteId,
@@ -873,25 +1044,8 @@ namespace Route4MeSDK
 
             foreach (var propInfo in typeof(Address).GetProperties())
             {
-                //var propName = propInfo.Name;
-
                 propInfo.SetValue(request, propInfo.GetValue(addressParameters));
-                /*
-                if (Array.Exists(addressProperties, element => element ==  propName))
-                {
-                    Object proprValue = propInfo.GetValue(addressParameters);
-                    if (proprValue != null)
-                    {
-                        request.GetType().InvokeMember(propName, 
-                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, 
-                            Type.DefaultBinder, request, new object[] { proprValue });
-                    }
-                        
                 }
-                */
-            }
-            
-            //addressParameters.PrepareForSerialization();
 
             return GetJsonObjectFromAPI<Address>(request, R4MEInfrastructureSettings.GetAddress, HttpMethodType.Put, out errorString);
 		}
@@ -912,12 +1066,27 @@ namespace Route4MeSDK
             foreach (var propInfo in typeof(Address).GetProperties())
             {
                 propInfo.SetValue(request, propInfo.GetValue(addressParameters));
-
             }
 
             var dataObject = GetJsonObjectFromAPI<DataObject>(request, R4MEInfrastructureSettings.ApiHost, HttpMethodType.Put, out errorString);
 
             return dataObject?.Addresses?.Where(x => x.RouteDestinationId == addressParameters.RouteDestinationId).FirstOrDefault() ?? null;
+        }
+
+        /// <summary>
+        /// Get schedule calendar from the user's account.
+        /// </summary>
+        /// <param name="scheduleCalendarParams">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Schedule calendar of the member</returns>
+        public ScheduleCalendarResponse GetScheduleCalendar(ScheduleCalendarQuery scheduleCalendarParams, out string errorString)
+        {
+            var response = GetJsonObjectFromAPI<ScheduleCalendarResponse>(scheduleCalendarParams,
+                                                                   R4MEInfrastructureSettings.ScheduleCalendar,
+                                                                   HttpMethodType.Get,
+                                                                   out errorString);
+
+            return response;
         }
 
         #endregion
@@ -933,7 +1102,7 @@ namespace Route4MeSDK
         /// </param>
         /// <param name="errorString">Returned error string in case of the processs failing</param>
         /// <returns>An optimization with the tracking data</returns>
-        public DataObjectRoute GetLastLocation(GenericParameters parameters, out string errorString)
+        public DataObjectRoute GetLastLocation(RouteParametersQuery parameters, out string errorString)
 		{
 			var result = GetJsonObjectFromAPI<DataObjectRoute>(parameters,
 														  R4MEInfrastructureSettings.RouteHost,
@@ -964,18 +1133,21 @@ namespace Route4MeSDK
 		/// If query was without error, but nothing was found, returns null.
 		/// If query failed, return error string.
 		/// </returns>
-		public object GetDeviceLocationHistory(GPSParameters gpsParameters, out string errorString)
+		public DeviceLocationHistoryResponse GetDeviceLocationHistory(GPSParameters gpsParameters, out string errorString)
 		{
-			var result = GetJsonObjectFromAPI<GetDeviceLocationHistoryResponse>(gpsParameters,
+			var result = GetJsonObjectFromAPI<DeviceLocationHistoryResponse>(gpsParameters,
 													R4MEInfrastructureSettings.DeviceLocation,
 													HttpMethodType.Get,
 													false,
 													out errorString);
 
-            var dataLength = ((GetDeviceLocationHistoryResponse)result).data.Length;
+            //var dataLength = ((DeviceLocationHistoryResponse)result).data.Length;
 
-            return (result == null && errorString != "") ? errorString 
-                : ((dataLength == 0) ? null : (object)result);
+            return (result == null && errorString != "") 
+                ? null 
+                : ((((DeviceLocationHistoryResponse)result).data.Length == 0) 
+                    ? null 
+                    : (DeviceLocationHistoryResponse)result);
 		}
 
         /// <summary>
@@ -989,7 +1161,7 @@ namespace Route4MeSDK
         /// </returns>
 		public SetGpsResponse SetGPS(GPSParameters gpsParameters, out string errorString)
 		{
-			SetGpsResponse result = GetJsonObjectFromAPI<SetGpsResponse>(gpsParameters,
+			var result = GetJsonObjectFromAPI<SetGpsResponse>(gpsParameters,
 													R4MEInfrastructureSettings.SetGpsHost,
 													HttpMethodType.Get,
 													false,
@@ -1017,7 +1189,7 @@ namespace Route4MeSDK
         /// <returns>The object of the type FindAssetResponse</returns>
 		public FindAssetResponse FindAsset(string tracking, out string errorString)
 		{
-			FindAssetRequest request = new FindAssetRequest { Tracking = tracking };
+			var request = new FindAssetRequest { Tracking = tracking };
 
             return GetJsonObjectFromAPI<FindAssetResponse>(request, R4MEInfrastructureSettings.AssetTracking, HttpMethodType.Get, false, out errorString);
 		}
@@ -1025,12 +1197,12 @@ namespace Route4MeSDK
         /// <summary>
         /// Get user locations
         /// </summary>
-        /// <param name="parameters"></param>
-        /// <param name="errorString"></param>
-        /// <returns></returns>
-        public Dictionary<string,UserLocation> GetUserLocations(GenericParameters parameters, out string errorString)
+        /// <param name="parameters">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An array of the user locations</returns>
+        public UserLocation[] GetUserLocations(GenericParameters parameters, out string errorString)
         {
-            var userLocations = GetJsonObjectFromAPI<Dictionary<string, UserLocation>>(parameters, 
+            var userLocations = GetJsonObjectFromAPI<UserLocation[]>(parameters, 
                 R4MEInfrastructureSettings.UserLocation, 
                 HttpMethodType.Get, 
                 false,out errorString);
@@ -1092,7 +1264,11 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberResponseV4</returns>
 		public MemberResponseV4 CreateUser(MemberParametersV4 memParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<MemberResponseV4>(memParams, R4MEInfrastructureSettings.GetUsersHost, HttpMethodType.Post, out errorString);
+            return GetJsonObjectFromAPI<MemberResponseV4>(
+                memParams, 
+                R4MEInfrastructureSettings.GetUsersHost, 
+                HttpMethodType.Post, 
+                out errorString);
 		}
 
         /// <summary>
@@ -1103,7 +1279,11 @@ namespace Route4MeSDK
         /// <returns>True if a member was successfuly removed from the user's account</returns>
 		public bool UserDelete(MemberParametersV4 memParams, out string errorString)
 		{
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(memParams, R4MEInfrastructureSettings.GetUsersHost, HttpMethodType.Delete, out errorString);
+			var response = GetJsonObjectFromAPI<StatusResponse>(
+                memParams, 
+                R4MEInfrastructureSettings.GetUsersHost,
+                HttpMethodType.Delete, 
+                out errorString);
 
             return (response == null) ? false : ((response.status) ? true : false);
 		}
@@ -1116,7 +1296,11 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberResponseV4</returns>
 		public MemberResponseV4 GetUserById(MemberParametersV4 memParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<MemberResponseV4>(memParams, R4MEInfrastructureSettings.GetUsersHost, HttpMethodType.Get, out errorString);
+            return GetJsonObjectFromAPI<MemberResponseV4>(
+                memParams, 
+                R4MEInfrastructureSettings.GetUsersHost, 
+                HttpMethodType.Get, 
+                out errorString);
 		}
 
         /// <summary>
@@ -1136,14 +1320,14 @@ namespace Route4MeSDK
         /// </summary>
         /// <param name="memParams">An object of the type MemberParameters containing the parameters:
         /// <para>StrEmail: user email</para>
-        /// para>StrPassword: user password</para>
-        /// para>Format: response format</para>
+        /// <para>StrPassword: user password</para>
+        /// <para>Format: response format</para>
         /// </param>
         /// <param name="errorString">Error message text</param>
         /// <returns>An object of the type MemberResponse</returns>
 		public MemberResponse UserAuthentication(MemberParameters memParams, out string errorString)
 		{
-			MemberParameters roParams = new MemberParameters();
+			var roParams = new MemberParameters();
 
 			var keyValues = new List<KeyValuePair<string, string>>()
             {
@@ -1152,10 +1336,15 @@ namespace Route4MeSDK
                 new KeyValuePair<string, string>("format", memParams.Format)
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
-            return GetJsonObjectFromAPI<MemberResponse>(roParams, R4MEInfrastructureSettings.UserAuthentication, 
-                HttpMethodType.Post, httpContent, out errorString);
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                return GetJsonObjectFromAPI<MemberResponse>(
+                    roParams, 
+                    R4MEInfrastructureSettings.UserAuthentication,
+                    HttpMethodType.Post, 
+                    httpContent, 
+                    out errorString);
+            };
 		}
 
         /// <summary>
@@ -1166,7 +1355,7 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberResponse</returns>
 		public MemberResponse UserRegistration(MemberParameters memParams, out string errorString)
 		{
-			MemberParameters roParams = new MemberParameters()
+			var roParams = new MemberParameters()
             {
                 Plan = memParams.Plan,
                 MemberType = memParams.MemberType
@@ -1185,10 +1374,11 @@ namespace Route4MeSDK
                 new KeyValuePair<string, string>("strPassword_2", memParams.StrPassword_2)
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
             return GetJsonObjectFromAPI<MemberResponse>(roParams, R4MEInfrastructureSettings.UserRegistration,
                 HttpMethodType.Post, httpContent, out errorString);
+            };
 		}
 
         /// <summary>
@@ -1218,14 +1408,19 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberResponse</returns>
 		public MemberResponse ValidateSession(MemberParameters memParams, out string errorString)
 		{
-			ValidateSessionRequest request = new ValidateSessionRequest
+			var request = new ValidateSessionRequest
 			{
 				SessionGuid = memParams.SessionGuid,
 				MemberId = memParams.MemberId,
 				Format = memParams.Format
 			};
 
-            return GetJsonObjectFromAPI<MemberResponse>(request, R4MEInfrastructureSettings.ValidateSession, HttpMethodType.Get, false, out errorString);
+            return GetJsonObjectFromAPI<MemberResponse>(
+                request, 
+                R4MEInfrastructureSettings.ValidateSession, 
+                HttpMethodType.Get, 
+                false, 
+                out errorString);
 		}
 
         /// <summary>
@@ -1244,15 +1439,16 @@ namespace Route4MeSDK
 
         public MemberConfigurationResponse CreateNewConfigurationKey(MemberConfigurationParameters[] confParams, out string errorString)
         {
-            GenericParameters genParams = new GenericParameters();
+            var genParams = new GenericParameters();
 
-            var httpContent = new StringContent(fastJSON.JSON.ToJSON(confParams), System.Text.Encoding.UTF8, "application/json");
-
+            using (var httpContent = new StringContent(fastJSON.JSON.ToJSON(confParams), System.Text.Encoding.UTF8, "application/json"))
+            {
             var response = GetJsonObjectFromAPI<MemberConfigurationResponse>
                 (genParams, R4MEInfrastructureSettings.UserConfiguration,
                 HttpMethodType.Post, httpContent, out errorString);
 
             return response;
+            };
         }
 
         /// <summary>
@@ -1263,7 +1459,11 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberConfigurationResponse</returns>
 		public MemberConfigurationResponse RemoveConfigurationKey(MemberConfigurationParameters confParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<MemberConfigurationResponse>(confParams, R4MEInfrastructureSettings.UserConfiguration, HttpMethodType.Delete, out errorString);
+            return GetJsonObjectFromAPI<MemberConfigurationResponse>(
+                confParams, 
+                R4MEInfrastructureSettings.UserConfiguration, 
+                HttpMethodType.Delete, 
+                out errorString);
 		}
 
         /// <summary>
@@ -1285,9 +1485,8 @@ namespace Route4MeSDK
         /// <returns>An object of the type MemberConfigurationResponse</returns>
 		public MemberConfigurationDataResponse GetConfigurationData(MemberConfigurationParameters confParams, out string errorString)
 		{
-			GetConfigurationDataRequest mParams = default(GetConfigurationDataRequest);
+            var mParams = new GetConfigurationDataRequest();
 
-			mParams = new GetConfigurationDataRequest();
 			if ((confParams != null)) mParams.config_key = confParams.config_key;
 
             return GetJsonObjectFromAPI<MemberConfigurationDataResponse>(mParams, 
@@ -1305,6 +1504,58 @@ namespace Route4MeSDK
             return GetJsonObjectFromAPI<MemberConfigurationResponse>(confParams, R4MEInfrastructureSettings.UserConfiguration, HttpMethodType.Put, out errorString);
 		}
 
+
+        public MemberCapabilities GetMemberCapabilities(string apiKey, out string errorString)
+        {
+            var parameters = new GenericParameters();
+
+            parameters.ParametersCollection.Add("ApiKey", apiKey);
+
+            var result = GetJsonObjectFromAPI<MemberCapabilities>(parameters,
+                                R4MEInfrastructureSettings.MemberCapabilities,
+                                HttpMethodType.Get,
+                                out errorString);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Check if the member with the actualApiKey has commercial member capability.
+        /// </summary>
+        /// <param name="actualApiKey">Actual API key</param>
+        /// <param name="demoApiKey">Demo API key</param>
+        /// <param name="errorString">Error message text</param>
+        /// <returns>True, if the member has commercial capability</returns>
+        public bool MemberHasCommercialCapability(string actualApiKey, string demoApiKey, out string errorString)
+        {
+            try
+            {
+                var memberCapabilities = this.GetMemberCapabilities(actualApiKey, out errorString);
+
+                if (actualApiKey == demoApiKey || memberCapabilities == null) return false;
+
+                var commercialSubscription = memberCapabilities
+                    .GetType()
+                    .GetProperties()
+                    .Where(x => x.Name == "Commercial")
+                    .FirstOrDefault();
+
+                if (commercialSubscription == null) return false;
+                
+                if (commercialSubscription.GetValue(memberCapabilities).GetType() != typeof(bool)) return false;
+
+                bool isCommercial = (bool)commercialSubscription.GetValue(memberCapabilities);
+
+                if (!isCommercial) return false;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorString = ex.Message;
+                return false;
+            }
+        }
         #endregion
 
         #region Address Notes
@@ -1320,14 +1571,14 @@ namespace Route4MeSDK
         /// <returns>An array of the AddressNote type objects </returns>
         public AddressNote[] GetAddressNotes(NoteParameters noteParameters, out string errorString)
 		{
-			AddressParameters addressParameters = new AddressParameters()
+			var addressParameters = new AddressParameters()
 			{
 				RouteId = noteParameters.RouteId,
 				RouteDestinationId = noteParameters.AddressId,
 				Notes = true
 			};
 
-			Address address = this.GetAddress(addressParameters, out errorString);
+			var address = this.GetAddress(addressParameters, out errorString);
 
             return (address != null) ? address.Notes : null;
 		}
@@ -1381,7 +1632,7 @@ namespace Route4MeSDK
 				attachmentFileStream = File.OpenRead(attachmentFilePath);
 				attachmentStreamContent = new StreamContent(attachmentFileStream);
 
-				MultipartFormDataContent multipartFormDataContent = new MultipartFormDataContent();
+				var multipartFormDataContent = new MultipartFormDataContent();
 				multipartFormDataContent.Add(attachmentStreamContent, "strFilename", Path.GetFileName(attachmentFilePath));
 				multipartFormDataContent.Add(new StringContent(strUpdateType), "strUpdateType");
 				multipartFormDataContent.Add(new StringContent(noteContents), "strNoteContents");
@@ -1399,7 +1650,7 @@ namespace Route4MeSDK
 				httpContent = new FormUrlEncodedContent(keyValues);
 			}
 
-			AddAddressNoteResponse response = GetJsonObjectFromAPI<AddAddressNoteResponse>(noteParameters,
+			var response = GetJsonObjectFromAPI<AddAddressNoteResponse>(noteParameters,
 																 R4MEInfrastructureSettings.AddRouteNotesHost,
 																 HttpMethodType.Post,
 																 httpContent,
@@ -1414,6 +1665,58 @@ namespace Route4MeSDK
 
             return (response != null) ? (response.Note != null ? response.Note : null) : null;
 		}
+
+        /// <summary>
+        /// The method offers ability to send a complex note at once,
+        /// with text content, uploading file, custom notes.
+        /// </summary>
+        /// <param name="noteParameters">The note parameters of the type NoteParameters
+        /// Note: contains form data elemets too</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Created address note</returns>
+        public AddressNote AddAddressNote(NoteParameters noteParameters, out string errorString)
+        {
+            //HttpContent httpContent = null;
+            FileStream attachmentFileStream = null;
+            StreamContent attachmentStreamContent = null;
+
+            var multipartFormDataContent = new MultipartFormDataContent();
+
+            if (noteParameters.StrFileName!=null)
+            {
+                attachmentFileStream = File.OpenRead(noteParameters.StrFileName);
+                attachmentStreamContent = new StreamContent(attachmentFileStream);
+                multipartFormDataContent.Add(attachmentStreamContent, "strFilename", Path.GetFileName(noteParameters.StrFileName));
+            }
+
+            multipartFormDataContent.Add(new StringContent(noteParameters.ActivityType), "strUpdateType");
+            multipartFormDataContent.Add(new StringContent(noteParameters.StrNoteContents), "strNoteContents");
+
+            if (noteParameters.CustomNoteTypes!=null && noteParameters.CustomNoteTypes.Count>0)
+            {
+                foreach (KeyValuePair<string,string> customNote in noteParameters.CustomNoteTypes)
+                {
+                    multipartFormDataContent.Add(new StringContent(customNote.Value), customNote.Key);
+                }
+            }
+
+            HttpContent httpContent = multipartFormDataContent;
+
+            var response = GetJsonObjectFromAPI<AddAddressNoteResponse>(noteParameters,
+                                        R4MEInfrastructureSettings.AddRouteNotesHost,
+                                        HttpMethodType.Post,
+                                        httpContent,
+                                        out errorString);
+
+
+            if (attachmentStreamContent != null) attachmentStreamContent.Dispose();
+            if (attachmentFileStream != null) attachmentFileStream.Dispose();
+
+            if (response != null && response.Note == null && response.Status == false)
+                errorString = "Note not added";
+
+            return (response != null) ? (response.Note != null ? response.Note : null) : null;
+        }
 
         /// <summary>
         /// Adds an address note to the route destination.
@@ -1460,19 +1763,19 @@ namespace Route4MeSDK
         /// <summary>
         /// Adds custom note type to a route destination.
         /// </summary>
-        /// <param name="customType"></param>
+        /// <param name="customType">A custom note type</param>
         /// <param name="values">Array of the string type notes</param>
         /// <param name="errorString">Error message text</param>
         /// <returns>If succefful, returns non-negative affected number, otherwise: -1</returns>
         public object AddCustomNoteType(string customType, string[] values, out string errorString)
 		{
-			AddCustomNoteTypeRequest request = new AddCustomNoteTypeRequest()
+			var request = new AddCustomNoteTypeRequest()
 			{
 				Type = customType,
 				Values = values
 			};
 
-			AddCustomNoteTypeResponse response = GetJsonObjectFromAPI<AddCustomNoteTypeResponse>(request,
+			var response = GetJsonObjectFromAPI<AddCustomNoteTypeResponse>(request,
 																 R4MEInfrastructureSettings.CustomNoteType,
 																 HttpMethodType.Post,
 																	out errorString);
@@ -1499,9 +1802,9 @@ namespace Route4MeSDK
         /// <returns>if succefful, returns non-negative affected number, otherwise: -1</returns>
         public object removeCustomNoteType(int customNoteId, out string errorString)
 		{
-			removeCustomNoteTypeRequest request = new removeCustomNoteTypeRequest() { id = customNoteId };
+			var request = new removeCustomNoteTypeRequest() { id = customNoteId };
 
-			AddCustomNoteTypeResponse response = GetJsonObjectFromAPI<AddCustomNoteTypeResponse>(request,
+			var response = GetJsonObjectFromAPI<AddCustomNoteTypeResponse>(request,
 																R4MEInfrastructureSettings.CustomNoteType,
 																HttpMethodType.Delete,
 																   out errorString);
@@ -1516,7 +1819,7 @@ namespace Route4MeSDK
         /// <returns>An array of the custom note types</returns>
 		public object getAllCustomNoteTypes(out string errorString)
 		{
-            GenericParameters request = new GenericParameters();
+            var request = new GenericParameters();
 
             CustomNoteType[] response = GetJsonObjectFromAPI<CustomNoteType[]>(request,
 																R4MEInfrastructureSettings.CustomNoteType,
@@ -1566,9 +1869,9 @@ namespace Route4MeSDK
 
             customNotes.ForEach(kv1 => { keyValues.Add(new KeyValuePair<string, string>(kv1.Key, kv1.Value)); });
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
-			AddAddressNoteResponse response = GetJsonObjectFromAPI<AddAddressNoteResponse>(noteParameters,
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                var response = GetJsonObjectFromAPI<AddAddressNoteResponse>(noteParameters,
 															   R4MEInfrastructureSettings.AddRouteNotesHost,
 															   HttpMethodType.Post,
 															   httpContent,
@@ -1577,6 +1880,7 @@ namespace Route4MeSDK
             return (response == null) ? (object)errorString : (response.GetType() != typeof(AddAddressNoteResponse) 
                 ? "Can not add custom note to the route" 
                 : (response.Status ? (object)response.Note : "Can not add custom note to the route"));
+            };
 		}
 
 		#endregion
@@ -1606,7 +1910,7 @@ namespace Route4MeSDK
         /// <returns> List of the Activity type objects </returns>
         public Activity[] GetActivityFeed(ActivityParameters activityParameters, out string errorString)
 		{
-			GetActivitiesResponse response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
+			var response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
 																 R4MEInfrastructureSettings.ActivityFeedHost,
 																 HttpMethodType.Get,
 																 out errorString);
@@ -1614,9 +1918,15 @@ namespace Route4MeSDK
             return (response != null) ? response.Results : null;
 		}
 
-        public Activity[] GetActiviies(ActivityParameters activityParameters, out string errorString)
+        /// <summary>
+		/// Get all the activities limited by query parameters.
+		/// </summary>
+		/// <param name="activityParameters">Query parameters</param>
+		/// <param name="errorString">Error string</param>
+		/// <returns>An array of the activities.</returns>
+        public Activity[] GetActivities(ActivityParameters activityParameters, out string errorString)
         {
-            GetActivitiesResponse response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
+            var response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
                                                                  R4MEInfrastructureSettings.GetActivitiesHost,
                                                                  HttpMethodType.Get,
                                                                  out errorString);
@@ -1634,7 +1944,7 @@ namespace Route4MeSDK
 		{
 			activity.PrepareForSerialization();
 
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(activity,
+			var response = GetJsonObjectFromAPI<StatusResponse>(activity,
 																   R4MEInfrastructureSettings.ActivityFeedHost,
 																   HttpMethodType.Post,
 																   out errorString);
@@ -1650,7 +1960,7 @@ namespace Route4MeSDK
         /// <returns>An array of the Activity type objects</returns>
 		public Activity[] GetAnalytics(ActivityParameters activityParameters, out string errorString)
 		{
-			GetActivitiesResponse response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
+			var response = GetJsonObjectFromAPI<GetActivitiesResponse>(activityParameters,
 																 R4MEInfrastructureSettings.ActivityFeedHost,
 																 HttpMethodType.Get,
 																 out errorString);
@@ -1700,21 +2010,21 @@ namespace Route4MeSDK
 		}
 
         public Address[] AddRouteDestinations(string routeId, Address[] addresses, bool optimalPosition, Func<Address, Address, bool> comparer, out string errorString)
-        {
-            AddRouteDestinationRequest request = new AddRouteDestinationRequest()
-            {
-                RouteId = routeId,
-                Addresses = addresses,
-                OptimalPosition = optimalPosition
-            };
+		{
+			var request = new AddRouteDestinationRequest()
+			{
+				RouteId = routeId,
+				Addresses = addresses,
+				OptimalPosition = optimalPosition
+			};
 
-            DataObject response = this.GetJsonObjectFromAPI<DataObject>(request,
-                                                             R4MEInfrastructureSettings.RouteHost,
-                                                             HttpMethodType.Put,
-                                                             out errorString);
+			var response = GetJsonObjectFromAPI<DataObject>(request,
+																   R4MEInfrastructureSettings.RouteHost,
+																   HttpMethodType.Put,
+																   out errorString);
             Address[] destinations = null;
             if (response != null && response.Addresses != null)
-            {
+			{
                 List<Address> arrDestinations = new List<Address>();
                 foreach (Address addressNew in addresses)
                 {
@@ -1727,12 +2037,12 @@ namespace Route4MeSDK
                         }
                     }
                     if (foundAddress != null)
-                    {
+                {
                         arrDestinations.Add(foundAddress);
                     }
                 }
                 destinations = arrDestinations.ToArray();
-            }
+			}
             return destinations;
         }
 
@@ -1748,12 +2058,12 @@ namespace Route4MeSDK
         {
             return this.AddRouteDestinations(routeId, addresses, optimalPosition, (addressResp, addressNew) =>
             {
-                return addressResp.AddressString == addressNew.AddressString
-                    && addressResp.Latitude == addressNew.Latitude
-                    && addressResp.Longitude == addressNew.Longitude
-                    && addressResp.RouteDestinationId != null;
+                return addressResp.AddressString == addressNew.AddressString &&
+                        Math.Abs(addressResp.Latitude - addressNew.Latitude)<0.0001 && 
+                        Math.Abs(addressResp.Longitude - addressNew.Longitude)<0.0001 && 
+                        addressResp.RouteDestinationId != null;
             }, out errorString);
-        }
+		}
 
         /// <summary>
         /// Add address(es) into a route.
@@ -1763,10 +2073,17 @@ namespace Route4MeSDK
         /// <param name="errorString"> out: Error as string </param>
         /// <returns> An array of <see cref="Address"/> objects that were added.</returns>
         public Address[] AddRouteDestinations(string routeId, Address[] addresses, out string errorString)
-        {
+		{
             return this.AddRouteDestinations(routeId, addresses, optimalPosition: true, errorString: out errorString);
-        }
-       
+		}
+
+        /// <summary>
+        /// Add specified destinations to an optimization
+        /// </summary>
+        /// <param name="optimizationId">Optimization ID</param>
+        /// <param name="addresses">An array of the addresses</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An array of the added address IDs</returns>
         public int?[] AddOptimizationDestinations (string optimizationId, Address[] addresses, out string errorString)
         {
             var request = new AddRouteDestinationRequest()
@@ -1822,12 +2139,13 @@ namespace Route4MeSDK
         /// <returns>True if a destination removing finished successfully</returns>
 		public bool RemoveRouteDestination(string routeId, int destinationId, out string errorString)
 		{
-			RemoveRouteDestinationRequest request = new RemoveRouteDestinationRequest()
+			var request = new RemoveRouteDestinationRequest()
 			{
 				RouteId = routeId,
 				RouteDestinationId = destinationId
 			};
-			RemoveRouteDestinationResponse response = GetJsonObjectFromAPI<RemoveRouteDestinationResponse>(request,
+
+			var response = GetJsonObjectFromAPI<RemoveRouteDestinationResponse>(request,
 																   R4MEInfrastructureSettings.GetAddress,
 																   HttpMethodType.Delete,
 																   out errorString);
@@ -1867,9 +2185,9 @@ namespace Route4MeSDK
                 new KeyValuePair<string, string>("after_destination_id", Convert.ToString(afterDestinationId))
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
-			MoveDestinationToRouteResponse response = GetJsonObjectFromAPI<MoveDestinationToRouteResponse>(new GenericParameters(),
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                var response = GetJsonObjectFromAPI<MoveDestinationToRouteResponse>(new GenericParameters(),
 																 R4MEInfrastructureSettings.MoveRouteDestination,
 																 HttpMethodType.Post,
 																 httpContent,
@@ -1878,6 +2196,7 @@ namespace Route4MeSDK
             if (response.error != null) errorString = response.error;
 
             return (response != null) ? response.Success : false;
+            };
 		}
 
         /// <summary>
@@ -1892,7 +2211,7 @@ namespace Route4MeSDK
 
             /// <value>The route destination ID</value>
 			[HttpQueryMemberAttribute(Name = "address_id", EmitDefaultValue = false)]
-			public System.Nullable<int> AddressId { get; set; }
+			public int? AddressId { get; set; }
 
             /// <value>If true an addres will be marked as departed</value>
 			[IgnoreDataMember()]
@@ -1917,7 +2236,7 @@ namespace Route4MeSDK
         /// <returns>Number of the marked addresses</returns>
 		public int MarkAddressVisited(AddressParameters aParams, out string errorString)
 		{
-			MarkAddressDepartedRequest request = new MarkAddressDepartedRequest
+			var request = new MarkAddressDepartedRequest
 			{
 				RouteId = aParams.RouteId,
 				AddressId = aParams.AddressId,
@@ -1925,7 +2244,11 @@ namespace Route4MeSDK
 				MemberId = 1
 			};
 
-			string response = GetJsonObjectFromAPI<string>(request, R4MEInfrastructureSettings.MarkAddressVisited, HttpMethodType.Get, out errorString);
+			string response = GetJsonObjectFromAPI<string>
+                (request, 
+                R4MEInfrastructureSettings.MarkAddressVisited, 
+                HttpMethodType.Get, 
+                out errorString);
 
             int iResponse = 0;
             return (int.TryParse(response.ToString(), out iResponse)) ? Convert.ToInt32(response) : 0;
@@ -1947,23 +2270,24 @@ namespace Route4MeSDK
 		}
 
         /// <summary>
-        /// Marks an address as deaprted.
+        /// Marks an address as departed.
         /// </summary>
         /// <param name="aParams">An AddressParameters type object as the input parameters</param>
         /// <param name="errorString">out: Error as string</param>
         /// <returns>Number of the marked addresses</returns>
 		public int MarkAddressDeparted(AddressParameters aParams, out string errorString)
 		{
-			MarkAddressDepartedRequest request = new MarkAddressDepartedRequest
+			var request = new MarkAddressDepartedRequest
 			{
 				RouteId = aParams.RouteId,
 				AddressId = aParams.AddressId,
-				IsDeparted = aParams.IsDeparted,
-				MemberId = 1
+				IsDeparted = aParams.IsDeparted
 			};
 
-			MarkAddressDepartedResponse response = GetJsonObjectFromAPI<MarkAddressDepartedResponse>(request, 
-                R4MEInfrastructureSettings.MarkAddressDeparted, HttpMethodType.Get, out errorString);
+			var response = GetJsonObjectFromAPI<MarkAddressDepartedResponse>(
+                request, 
+                R4MEInfrastructureSettings.MarkAddressDeparted, 
+                HttpMethodType.Get, out errorString);
 
             return (response != null) ? (response.Status ? 1 : 0) : 0;
 		}
@@ -2001,14 +2325,18 @@ namespace Route4MeSDK
         /// <returns>An Address type object</returns>
 		public Address MarkAddressAsMarkedAsVisited(AddressParameters aParams, out string errorString)
 		{
-			MarkAddressAsMarkedAsDepartedRequest request = new MarkAddressAsMarkedAsDepartedRequest
+			var request = new MarkAddressAsMarkedAsDepartedRequest
 			{
 				RouteId = aParams.RouteId,
 				RouteDestinationId = aParams.RouteDestinationId,
 				IsVisited = aParams.IsVisited
 			};
 
-            return GetJsonObjectFromAPI<Address>(request, R4MEInfrastructureSettings.GetAddress, HttpMethodType.Put, out errorString);
+            return GetJsonObjectFromAPI<Address>(
+                request, 
+                R4MEInfrastructureSettings.GetAddress, 
+                HttpMethodType.Put, 
+                out errorString);
 		}
 
         /// <summary>
@@ -2019,14 +2347,18 @@ namespace Route4MeSDK
         /// <returns>An Address type object</returns>
 		public Address MarkAddressAsMarkedAsDeparted(AddressParameters aParams, out string errorString)
 		{
-			MarkAddressAsMarkedAsDepartedRequest request = new MarkAddressAsMarkedAsDepartedRequest
+			var request = new MarkAddressAsMarkedAsDepartedRequest
 			{
 				RouteId = aParams.RouteId,
 				RouteDestinationId = aParams.RouteDestinationId,
 				IsDeparted = aParams.IsDeparted
 			};
 
-            return GetJsonObjectFromAPI<Address>(request, R4MEInfrastructureSettings.GetAddress, HttpMethodType.Put, out errorString);
+            return GetJsonObjectFromAPI<Address>(
+                request, 
+                R4MEInfrastructureSettings.GetAddress, 
+                HttpMethodType.Put, 
+                out errorString);
 		}
 
 		#endregion
@@ -2037,7 +2369,7 @@ namespace Route4MeSDK
         /// The response from the getting process of the address book contacts
         /// </summary>
 		[DataContract]
-		private sealed class GetAddressBookContactsResponse : GenericParameters
+		public sealed class GetAddressBookContactsResponse : GenericParameters
 		{
             /// <value>Array of the AddressBookContact type objects</value>
 			[DataMember(Name = "results", IsRequired = false)]
@@ -2078,6 +2410,8 @@ namespace Route4MeSDK
         /// <returns>The array of the address book contacts</returns>
 		public AddressBookContact[] GetAddressBookLocation(AddressBookParameters addressBookParameters, out uint total, out string errorString)
 		{
+            parseWithNewtonJson = true;
+
             if (addressBookParameters.AddressId!=null && !addressBookParameters.AddressId.Contains(","))
             {
                 addressBookParameters.AddressId += "," + addressBookParameters.AddressId;
@@ -2128,7 +2462,7 @@ namespace Route4MeSDK
 		{
             /// <value>The list of the selected fields values</value>
 			[DataMember(Name = "results")]
-			public List<object[]> Results { get; set; }
+            public IList<object[]> Results { get; set; }
 
             /// <value>Number of the returned address book contacts</value>
 			[DataMember(Name = "total")]
@@ -2143,27 +2477,90 @@ namespace Route4MeSDK
         /// Searches for the address book locations 
         /// </summary>
         /// <param name="addressBookParameters">An AddressParameters type object as the input parameter</param>
-        /// <param name="total">out: Number of the returned contacts</param>
         /// <param name="errorString">out: Error as string</param>
         /// <returns>List of the selected fields values</returns>
-		public SearchAddressBookLocationResponse SearchAddressBookLocation(AddressBookParameters addressBookParameters, out string errorString)
+		public SearchAddressBookLocationResponse SearchAddressBookLocation(AddressBookParameters addressBookParameters, out List<AddressBookContact> contactsFromObjects, out string errorString)
 		{
+            if (addressBookParameters.Fields == null)
+		{
+                errorString = "Fields property should be specified.";
+                contactsFromObjects = null;
+                return null;
+            }
+
             var request = new SearchAddressBookLocationRequest();
+
+            contactsFromObjects = new List<AddressBookContact>();
 
             if (addressBookParameters.AddressId != null) request.AddressId = addressBookParameters.AddressId;
             if (addressBookParameters.Query != null) request.Query = addressBookParameters.Query;
-            if (addressBookParameters.Fields != null) request.Fields = addressBookParameters.Fields;
+            request.Fields = addressBookParameters.Fields;
             if (addressBookParameters.Offset != null) request.Offset = addressBookParameters.Offset >= 0 ? (int)addressBookParameters.Offset : 0;
             if (addressBookParameters.Limit != null) request.Limit = addressBookParameters.Limit >= 0 ? (int)addressBookParameters.Limit : 0;
 
-            request.PrepareForSerialization();
+            parseWithNewtonJson = true;
+            var response = GetJsonObjectFromAPI<SearchAddressBookLocationResponse>(request, R4MEInfrastructureSettings.AddressBook, HttpMethodType.Get, out string errorString0);
 
-            var response = GetJsonObjectFromAPI<SearchAddressBookLocationResponse>(request, R4MEInfrastructureSettings.AddressBook, HttpMethodType.Get, out errorString);
+            if (response!=null && response.Total>0)
+            {
+                var orderedPropertyNames = R4MeUtils.OrderPropertiesByPosition<AddressBookContact>(response.Fields.ToList(), out errorString);
 
-            //total = (response != null) ? response.Total : 0;
+                foreach (object[] contactObjects in response.Results)
+                {
+                    var contactFromObject = new AddressBookContact();
+                    foreach (var propertyName in orderedPropertyNames)
+                    {
+                        var value = contactObjects[orderedPropertyNames.IndexOf(propertyName)];
 
-            return (response != null) ? response : null;
+                        var valueType = value != null ? value.GetType().Name : "";
+
+                        PropertyInfo propInfo = typeof(AddressBookContact).GetProperty(propertyName);
+                        //Console.WriteLine(valueType);
+
+                        switch (propertyName)
+                        {
+                            case "address_custom_data":
+                                //var customData = R4MeUtils.ToDictionary<string>(value);
+                                var customData = R4MeUtils.ToObject<Dictionary<string,string>>(value, out string errorString1);
+                                if (errorString1 == "")
+                                    propInfo.SetValue(contactFromObject, customData);
+                                else
+                                    propInfo.SetValue(contactFromObject, 
+                                        new Dictionary<string, string>() { { "<WRONG DATA>", "<WRONG DATA>" } });
+                                break;
+                            case "schedule":
+                                var schedules = R4MeUtils.ToObject<Schedule[]>(value, out string errorString2);
+                                if (errorString2 == "") 
+                                    propInfo.SetValue(contactFromObject, schedules);
+                                else
+                                    propInfo.SetValue(contactFromObject, null);
+                                break;
+                            case "schedule_blacklist":
+                                var scheduleBlackList = R4MeUtils.ToObject<string[]>(value, out string errorString3);
+                                if (errorString3 == "") 
+                                    propInfo.SetValue(contactFromObject, scheduleBlackList);
+                                else
+                                    propInfo.SetValue(contactFromObject, new string[] { "<WRONG DATA>"});
+                                break;
+                            default:
+                                var convertedValue = valueType!="" 
+                                    ? R4MeUtils.ConvertObjectToPropertyType(value, propInfo) 
+                                    : value;
+                                propInfo.SetValue(contactFromObject, convertedValue);
+                                break;
+                        }
+                    }
+
+                    contactsFromObjects.Add(contactFromObject);
+                }
+            }
+            else
+            {
+                errorString = errorString0;
 		}
+
+            return response;
+        }
 
         /// <summary>
         /// Adds an address book contact to a user's account.
@@ -2173,6 +2570,8 @@ namespace Route4MeSDK
         /// <returns>The AddressBookContact type object</returns>
 		public AddressBookContact AddAddressBookContact(AddressBookContact contact, out string errorString)
 		{
+            parseWithNewtonJson = true;
+
 			contact.PrepareForSerialization();
             return GetJsonObjectFromAPI<AddressBookContact>(contact,
 											R4MEInfrastructureSettings.AddressBook,
@@ -2182,6 +2581,7 @@ namespace Route4MeSDK
 
         /// <summary>
         /// Updates an address book contact.
+        /// Note: this method ignores properties with null values.
         /// </summary>
         /// <param name="contact">The AddressBookContact type object as input parameters</param>
         /// <param name="errorString">out: Error as string</param>
@@ -2194,6 +2594,81 @@ namespace Route4MeSDK
 											HttpMethodType.Put,
 											out errorString);
 		}
+
+        /// <summary>
+        /// Updates an address book contact.
+        /// Used in case fo sending specified, limited number of the Contact parameters.
+        /// </summary>
+        /// <param name="contact">Address Book Contact</param>
+        /// <param name="updatableProperties">List of the properties which should be updated - 
+        /// despite are they null or not</param>
+        /// <param name="errorString">Error strings</param>
+        /// <returns>Address book contact</returns>
+        public AddressBookContact UpdateAddressBookContact(AddressBookContact contact, List<string> updatableProperties, out string errorString)
+        {
+            parseWithNewtonJson = true;
+
+            var myDynamicClass = new Route4MeDynamicClass();
+            myDynamicClass.CopyPropertiesFromClass(contact, updatableProperties, out string errorString0);
+
+            var jsonString = fastJSON.JSON.ToJSON(myDynamicClass.DynamicProperties);
+
+            var genParams = new GenericParameters();
+
+            var content = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+
+            var response = GetJsonObjectFromAPI<AddressBookContact>
+                (genParams, R4MEInfrastructureSettings.AddressBook,
+                HttpMethodType.Put, content, out errorString);
+
+            return response;
+        }
+
+        /// <summary>
+        /// Updates a contact by comparing initial and modified contact objects and
+        /// by updating only modified proeprties of a contact.
+        /// </summary>
+        /// <param name="contact">A address book contact object as input (modified or created virtual contact)</param>
+        /// <param name="initialContact">An initial address book contact</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Updated address book contact</returns>
+        public AddressBookContact UpdateAddressBookContact(AddressBookContact contact, AddressBookContact initialContact, out string errorString)
+        {
+            errorString = "";
+            parseWithNewtonJson = true;
+
+            if (initialContact == null || initialContact == contact)
+            {
+                errorString = "The initial and modified contacts should not be null";
+                return null;
+            }
+
+            var updatableContactProperties = R4MeUtils
+            .GetPropertiesWithDifferentValues(contact, initialContact, out errorString);
+
+            updatableContactProperties.Add("address_id");
+
+            if (updatableContactProperties != null && updatableContactProperties.Count > 0)
+            {
+                var dynamicContactProperties = new Route4MeDynamicClass();
+
+                dynamicContactProperties.CopyPropertiesFromClass(contact, updatableContactProperties, out string errorString0);
+
+                var contactParamsJsonString = R4MeUtils.SerializeObjectToJson(dynamicContactProperties.DynamicProperties, true);
+
+                var genParams = new GenericParameters();
+
+                var content = new StringContent(contactParamsJsonString, System.Text.Encoding.UTF8, "application/json");
+
+                var response = GetJsonObjectFromAPI<AddressBookContact>
+                    (genParams, R4MEInfrastructureSettings.AddressBook,
+                    HttpMethodType.Put, content, out errorString);
+
+                return response;
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// The request parameter for the address book contacts removing process.
@@ -2214,12 +2689,12 @@ namespace Route4MeSDK
         /// <returns>If true the contacts were removed successfully</returns>
 		public bool RemoveAddressBookContacts(string[] addressIds, out string errorString)
 		{
-			RemoveAddressBookContactsRequest request = new RemoveAddressBookContactsRequest()
+			var request = new RemoveAddressBookContactsRequest()
 			{
 				AddressIds = addressIds
 			};
 
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(request,
+			var response = GetJsonObjectFromAPI<StatusResponse>(request,
 																   R4MEInfrastructureSettings.AddressBook,
 																   HttpMethodType.Delete,
 																   out errorString);
@@ -2231,16 +2706,28 @@ namespace Route4MeSDK
 
 		#region Address Book Group
 
-
+        /// <summary>
+        /// Get the address book groups
+        /// </summary>
+        /// <param name="addressBookGroupParameters">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An arrayo of the address book contacts</returns>
 		public AddressBookGroup[] GetAddressBookGroups(AddressBookGroupParameters addressBookGroupParameters, out string errorString)
 		{
 			var response = GetJsonObjectFromAPI<AddressBookGroup[]>(addressBookGroupParameters,
 																 R4MEInfrastructureSettings.AddressBookGroup,
 																 HttpMethodType.Get,
 																 out errorString);
+			
 			return response;
 		}
 
+        /// <summary>
+        /// Get a specified address book group
+        /// </summary>
+        /// <param name="addressBookGroupParameters">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An address book group</returns>
 		public AddressBookGroup GetAddressBookGroup(AddressBookGroupParameters addressBookGroupParameters, out string errorString)
 		{
 			addressBookGroupParameters.PrepareForSerialization();
@@ -2248,56 +2735,98 @@ namespace Route4MeSDK
 																 R4MEInfrastructureSettings.AddressBookGroup,
 																 HttpMethodType.Get,
 																 out errorString);
+			
 			return response;
 		}
 
-		public AddressBookContactsResponse GetAddressBookContactsByGroup(AddressBookGroupParameters addressBookGroupParameters, out string errorString)
+        /// <summary>
+        /// Get address book contacts by specified group
+        /// </summary>
+        /// <param name="addressBookGroupParameters">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An address book group</returns>
+		public AddressBookContactsResponse GetAddressBookContactsByGroup(
+            AddressBookGroupParameters addressBookGroupParameters, 
+            out string errorString)
 		{
 			addressBookGroupParameters.PrepareForSerialization();
-			var response = GetJsonObjectFromAPI<AddressBookContactsResponse>(addressBookGroupParameters,
+			
+            var response = GetJsonObjectFromAPI<AddressBookContactsResponse>(
+                addressBookGroupParameters,
 																 R4MEInfrastructureSettings.AddressBookGroupSearch,
 																 HttpMethodType.Post,
 																 out errorString);
+			
 			return response;
 		}
 
+        /// <summary>
+        /// Search the address book groups by specified filter.
+        /// </summary>
+        /// <param name="addressBookGroupParameters">Query parameters</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An AddressBookContactsResponse type object</returns>
 		public AddressBookContactsResponse SearchAddressBookContactsByFilter(AddressBookGroupParameters addressBookGroupParameters, out string errorString)
 		{
 			addressBookGroupParameters.PrepareForSerialization();
-			var response = GetJsonObjectFromAPI<AddressBookContactsResponse>(addressBookGroupParameters,
+			var response = GetJsonObjectFromAPI<AddressBookContactsResponse>(
+                addressBookGroupParameters,
 																 R4MEInfrastructureSettings.AddressBook,
 																 HttpMethodType.Post,
 																 out errorString);
+			
 			return response;
 		}
 
+        /// <summary>
+        /// Create an address book group
+        /// </summary>
+        /// <param name="group">An address book group</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An address book group</returns>
 		public AddressBookGroup AddAddressBookGroup(AddressBookGroup group, out string errorString)
 		{
 			group.PrepareForSerialization();
-			AddressBookGroup result = GetJsonObjectFromAPI<AddressBookGroup>(group,
+			var result = GetJsonObjectFromAPI<AddressBookGroup>(group,
 																 R4MEInfrastructureSettings.AddressBookGroup,
 																 HttpMethodType.Post,
 																 out errorString);
+			
 			return result;
 		}
 
+        /// <summary>
+        /// Update an address book group
+        /// </summary>
+        /// <param name="group">An address book group</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An address book group</returns>
 		public AddressBookGroup UpdateAddressBookGroup(AddressBookGroup group, out string errorString)
 		{
 			group.PrepareForSerialization();
-			AddressBookGroup result = GetJsonObjectFromAPI<AddressBookGroup>(group,
+			AddressBookGroup result = GetJsonObjectFromAPI<AddressBookGroup>(
+                group,
 																 R4MEInfrastructureSettings.AddressBookGroup,
 																 HttpMethodType.Put,
 																 out errorString);
+
 			return result;
 		}
 
+        /// <summary>
+        /// Remove an address book group
+        /// </summary>
+        /// <param name="groupID">A group ID</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>Group creating status</returns>
 		public StatusResponse RemoveAddressBookGroup(AddressBookGroupParameters groupID, out string errorString)
 		{
 			groupID.PrepareForSerialization();
-			StatusResponse result = GetJsonObjectFromAPI<StatusResponse>(groupID,
+			var result = GetJsonObjectFromAPI<StatusResponse>(groupID,
 																 R4MEInfrastructureSettings.AddressBookGroup,
 																 HttpMethodType.Delete,
 																 out errorString);
+			
 			return result;
 		}
 
@@ -2313,7 +2842,7 @@ namespace Route4MeSDK
 		/// <returns> Avoidance zone Object </returns>
 		public AvoidanceZone AddAvoidanceZone(AvoidanceZoneParameters avoidanceZoneParameters, out string errorString)
 		{
-			AvoidanceZone avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneParameters,
+			var avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneParameters,
 																   R4MEInfrastructureSettings.Avoidance,
 																   HttpMethodType.Post,
 																   out errorString);
@@ -2343,7 +2872,7 @@ namespace Route4MeSDK
 		/// <returns> Avoidance zone Object </returns>
 		public AvoidanceZone GetAvoidanceZone(AvoidanceZoneQuery avoidanceZoneQuery, out string errorString)
 		{
-			AvoidanceZone avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneQuery,
+			var avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneQuery,
 																   R4MEInfrastructureSettings.Avoidance,
 																   HttpMethodType.Get,
 																   out errorString);
@@ -2358,7 +2887,7 @@ namespace Route4MeSDK
 		/// <returns> Avoidance zone Object </returns>
 		public AvoidanceZone UpdateAvoidanceZone(AvoidanceZoneParameters avoidanceZoneParameters, out string errorString)
 		{
-			AvoidanceZone avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneParameters,
+			var avoidanceZone = GetJsonObjectFromAPI<AvoidanceZone>(avoidanceZoneParameters,
 																   R4MEInfrastructureSettings.Avoidance,
 																   HttpMethodType.Put,
 																   out errorString);
@@ -2378,7 +2907,7 @@ namespace Route4MeSDK
 																 HttpMethodType.Delete,
 																 out errorString);
 
-			return result.status;
+			return result?.status ?? false;
 		}
 
 		#endregion
@@ -2389,7 +2918,7 @@ namespace Route4MeSDK
         /// The response for the orders getting process.
         /// </summary>
 		[DataContract]
-		private sealed class GetOrdersResponse
+		public sealed class GetOrdersResponse
         {
             /// <value>An arrary of the Order type objects </value>
 			[DataMember(Name = "results")]
@@ -2398,9 +2927,32 @@ namespace Route4MeSDK
             /// <value>Number of the returned orders</value>
             [DataMember(Name = "total")]
 			public uint Total { get; set; }
+
+            /// <value>Selected order fields to show</value>
+            [DataMember(Name = "fields", EmitDefaultValue = false)]
+            public string[] Fields { get; set; }
 		}
 
 		/// <summary>
+        /// The response from the orders searching process (contains specified fields).
+        /// </summary>
+        [DataContract]
+        public sealed class SearchOrdersResponse
+        {
+            /// <value>An arrary of the objects.
+            /// The item type: object[]</value>
+			[DataMember(Name = "results")]
+            public IList<object[]> Results { get; set; }
+
+            /// <value>Number of the returned orders</value>
+            [DataMember(Name = "total")]
+            public uint Total { get; set; }
+
+            [DataMember(Name = "fields", EmitDefaultValue = false)]
+            public string[] Fields { get; set; }
+        }
+
+        /// <summary>
 		/// Gets the Orders
 		/// </summary>
 		/// <param name="ordersQuery"> The query parameters for the orders request process </param>
@@ -2409,14 +2961,14 @@ namespace Route4MeSDK
 		/// <returns> List of the Order type objects </returns>
 		public Order[] GetOrders(OrderParameters ordersQuery, out uint total, out string errorString)
 		{
-			GetOrdersResponse response = GetJsonObjectFromAPI<GetOrdersResponse>(ordersQuery,
+			var response = GetJsonObjectFromAPI<GetOrdersResponse>(ordersQuery,
 																 R4MEInfrastructureSettings.Order,
 																 HttpMethodType.Get,
 																 out errorString);
 
             total = (response != null) ? response.Total : 0;
 
-            return (response != null) ? response.Results : null;
+            return (response != null) ? (Order[])response.Results : null;
 		}
 
         /// <summary>
@@ -2425,15 +2977,15 @@ namespace Route4MeSDK
         /// <param name="orderQuery">The OrderParameters type object as the input parameters containing coma-delimited list of the order IDs.</param>
         /// <param name="errorString"> out: Error as string </param>
         /// <returns>List of the Order type objects</returns>
-		public Order[] GetOrderByID(OrderParameters orderQuery, out string errorString)
+		public Order GetOrderByID(OrderParameters orderQuery, out string errorString)
 		{
-			string[] ids = orderQuery.order_id.Split(',');
-			if (ids.Length == 1) orderQuery.order_id = orderQuery.order_id + "," + orderQuery.order_id;
+			//string[] ids = orderQuery.order_id.Split(',');
+			//if (ids.Length == 1) orderQuery.order_id = orderQuery.order_id + "," + orderQuery.order_id;
 
-			GetOrdersResponse response = GetJsonObjectFromAPI<GetOrdersResponse>(orderQuery, 
+			var response = GetJsonObjectFromAPI<Order>(orderQuery, 
                 R4MEInfrastructureSettings.Order, HttpMethodType.Get, out errorString);
 
-			return response.Results;
+			return response;
 		}
 
         /// <summary>
@@ -2442,12 +2994,22 @@ namespace Route4MeSDK
         /// <param name="orderQuery">The OrderParameters type object as the query parameters</param>
         /// <param name="errorString">out: Error as string</param>
         /// <returns>List of the Order type objects</returns>
-		public Order[] SearchOrders(OrderParameters orderQuery, out string errorString)
+		public object SearchOrders(OrderParameters orderQuery, out string errorString)
 		{
-			GetOrdersResponse response = GetJsonObjectFromAPI<GetOrdersResponse>(orderQuery, 
-                R4MEInfrastructureSettings.Order, HttpMethodType.Get, out errorString);
+            bool showFields = (orderQuery?.Fields?.Length ?? 0) < 1
+                ? false 
+                : true;
 
-            return (response != null) ? response.Results : null;
+            if (showFields)
+            {
+                return GetJsonObjectFromAPI<SearchOrdersResponse>(orderQuery,
+                R4MEInfrastructureSettings.Order, HttpMethodType.Get, out errorString);
+            }
+            else
+            {
+                return GetJsonObjectFromAPI<GetOrdersResponse>(orderQuery,
+                R4MEInfrastructureSettings.Order, HttpMethodType.Get, out errorString);
+            }
 		}
 
         /// <summary>
@@ -2458,10 +3020,10 @@ namespace Route4MeSDK
         /// <returns>Array of the Order type objects</returns>
         public Order[] FilterOrders(OrderFilterParameters orderFilter, out string errorString)
         {
-            GetOrdersResponse response = GetJsonObjectFromAPI<GetOrdersResponse>(orderFilter,
+            var response = GetJsonObjectFromAPI<GetOrdersResponse>(orderFilter,
                 R4MEInfrastructureSettings.Order, HttpMethodType.Post, out errorString);
 
-            return (response != null) ? response.Results : null;
+            return (response != null) ? (Order[])response.Results : null;
         }
 
 		/// <summary>
@@ -2505,7 +3067,6 @@ namespace Route4MeSDK
 			public string[] OrderIds { get; set; }
 		}
 
-
         /// <summary>
         /// Removes the orders
         /// </summary>
@@ -2514,12 +3075,12 @@ namespace Route4MeSDK
         /// <returns> Result status: true/false </returns>
         public bool RemoveOrders(string[] orderIds, out string errorString)
 		{
-			RemoveOrdersRequest request = new RemoveOrdersRequest()
+			var request = new RemoveOrdersRequest()
 			{
 				OrderIds = orderIds
 			};
 
-			StatusResponse response = GetJsonObjectFromAPI<StatusResponse>(request,
+			var response = GetJsonObjectFromAPI<StatusResponse>(request,
 																   R4MEInfrastructureSettings.Order,
 																   HttpMethodType.Delete,
 																   out errorString);
@@ -2560,7 +3121,7 @@ namespace Route4MeSDK
         /// <returns>The RouteResponse type object</returns>
 		public RouteResponse AddOrdersToRoute(RouteParametersQuery rQueryParams, Address[] addresses, RouteParameters rParams, out string errorString)
 		{
-			AddOrdersToRouteRequest request = new AddOrdersToRouteRequest
+			var request = new AddOrdersToRouteRequest
 			{
 				RouteId = rQueryParams.RouteId,
 				Redirect = rQueryParams.Redirect == true ? 1 : 0,
@@ -2604,7 +3165,7 @@ namespace Route4MeSDK
         /// <returns>An optimization problem object</returns>
 		public DataObject AddOrdersToOptimization(OptimizationParameters rQueryParams, Address[] addresses, RouteParameters rParams, out string errorString)
 		{
-			AddOrdersToOptimizationRequest request = new AddOrdersToOptimizationRequest
+			var request = new AddOrdersToOptimizationRequest
 			{
 				OptimizationProblemId = rQueryParams.OptimizationProblemID,
 				Redirect = rQueryParams.Redirect == true ? 1 : 0,
@@ -2619,6 +3180,11 @@ namespace Route4MeSDK
 
         #region Order Custom User Field
 
+        /// <summary>
+        /// Get the order's custom user fields.
+        /// </summary>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An array of the order's custom user fieds</returns>
         public OrderCustomField[] GetOrderCustomUserFields(out string errorString)
         {
             var genParams = new GenericParameters(); 
@@ -2631,14 +3197,25 @@ namespace Route4MeSDK
             return response;
         }
 
+        /// <summary>
+        /// Create an order's custom user field.
+        /// </summary>
+        /// <param name="orderCustomUserField">An order's custom user field</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An OrderCustomFieldCreateResponse type object</returns>
         public OrderCustomFieldCreateResponse CreateOrderCustomUserField(OrderCustomFieldParameters orderCustomUserField, out string errorString)
         {
             return GetJsonObjectFromAPI<OrderCustomFieldCreateResponse>
                 (orderCustomUserField, R4MEInfrastructureSettings.OrderCustomField, 
                 HttpMethodType.Post, false, out errorString);
-
         }
 
+        /// <summary>
+        /// Remove an order's custom user field.
+        /// </summary>
+        /// <param name="orderCustomUserField">An order's custom user field.</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An OrderCustomFieldCreateResponse type object</returns>
         public OrderCustomFieldCreateResponse RemoveOrderCustomUserField(OrderCustomFieldParameters orderCustomUserField, out string errorString)
         {
             return GetJsonObjectFromAPI<OrderCustomFieldCreateResponse>
@@ -2646,6 +3223,12 @@ namespace Route4MeSDK
                 HttpMethodType.Delete, false, out errorString);
         }
 
+        /// <summary>
+        /// Update the order's custom user fields.
+        /// </summary>
+        /// <param name="orderCustomUserFieldParams">The order's custom user fields</param>
+        /// <param name="errorString">Error string</param>
+        /// <returns>An OrderCustomFieldCreateResponse type object</returns>
         public OrderCustomFieldCreateResponse UpdateOrderCustomUserField(OrderCustomFieldParameters orderCustomUserFieldParams, out string errorString)
         {
             orderCustomUserFieldParams.PrepareForSerialization();
@@ -2655,7 +3238,6 @@ namespace Route4MeSDK
                 HttpMethodType.Put, false, out errorString);
 
             return orderCustomField;
-
         }
 
         #endregion
@@ -2700,13 +3282,16 @@ namespace Route4MeSDK
         /// <returns>The geocoded addresses</returns>
 		public string Geocoding(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest
+			var request = new GeocodingRequest
 			{
 				Addresses = geoParams.Addresses,
 				Format = geoParams.Format
 			};
 
-			var response = GetXmlObjectFromAPI<string>(request, R4MEInfrastructureSettings.Geocoder, 
+            var response = request.Format == "xml"
+                ? GetXmlObjectFromAPI<string>(request, R4MEInfrastructureSettings.Geocoder,
+                HttpMethodType.Post, (HttpContent)null, true, out errorString)
+                : GetJsonObjectFromAPI<string>(request, R4MEInfrastructureSettings.Geocoder,
                 HttpMethodType.Post, (HttpContent)null, true, out errorString);
 
 			if (response == null) return errorString; else return response.ToString();
@@ -2720,17 +3305,24 @@ namespace Route4MeSDK
         /// <returns>The geocoded addresses</returns>
 		public string BatchGeocoding(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest { };
+			var request = new GeocodingRequest { };
 
 			var keyValues = new List<KeyValuePair<string, string>>()
             {
-                new KeyValuePair<string, string>("strExportFormat", geoParams.Format),
+                new KeyValuePair<string, string>("strExportFormat", geoParams.ExportFormat),
                 new KeyValuePair<string, string>("addresses", geoParams.Addresses)
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
-            return GetJsonObjectFromAPI<string>(request, R4MEInfrastructureSettings.Geocoder, HttpMethodType.Post, httpContent, true, out errorString);
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                return GetJsonObjectFromAPI<string>(
+                    request, 
+                    R4MEInfrastructureSettings.Geocoder, 
+                    HttpMethodType.Post, 
+                    httpContent, 
+                    true, 
+                    out errorString);
+            };
 		}
 
         /// <summary>
@@ -2764,15 +3356,18 @@ namespace Route4MeSDK
         /// <returns>The uploadAddressesToTemporaryStorageResponse type object</returns>
 		public uploadAddressesToTemporaryStorageResponse uploadAddressesToTemporaryStorage(string jsonAddresses, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest { };
+			var request = new GeocodingRequest { };
 
 			HttpContent content = new StringContent(jsonAddresses);
 			content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-			Tuple<uploadAddressesToTemporaryStorageResponse, string> result = GetJsonObjectFromAPIAsync<uploadAddressesToTemporaryStorageResponse>(request,
+			Tuple<uploadAddressesToTemporaryStorageResponse, string> result = 
+                GetJsonObjectFromAPIAsync<uploadAddressesToTemporaryStorageResponse>(
+                    request,
 															   R4MEInfrastructureSettings.FastGeocoder,
 															   HttpMethodType.Post,
-															   content, false).GetAwaiter().GetResult();
+					content, 
+                    false).GetAwaiter().GetResult();
 
 			Thread.SpinWait(5000);
 
@@ -2789,7 +3384,7 @@ namespace Route4MeSDK
         /// <returns>The geocoded addresses</returns>
 		public string BatchGeocodingAsync(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest { };
+			var request = new GeocodingRequest { };
 
 			var keyValues = new List<KeyValuePair<string, string>>()
             {
@@ -2797,8 +3392,8 @@ namespace Route4MeSDK
                 new KeyValuePair<string, string>("addresses", geoParams.Addresses)
             };
 
-			HttpContent httpContent = new FormUrlEncodedContent(keyValues);
-
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
 			Task<Tuple<string, string>> result = GetJsonObjectFromAPIAsync<string>(request,
 																R4MEInfrastructureSettings.Geocoder,
 																HttpMethodType.Post,
@@ -2809,6 +3404,7 @@ namespace Route4MeSDK
             errorString = (result.IsFaulted || result.IsCanceled) ? result.Result.Item2 : "";
 
 			return result.Result.Item1;
+            };
 		}
 
         /// <summary>
@@ -2819,22 +3415,23 @@ namespace Route4MeSDK
         /// <returns>An array of the street data</returns>
 		public ArrayList RapidStreetData(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest
+			var request = new GeocodingRequest
 			{
 				Addresses = geoParams.Addresses,
-				Format = geoParams.Format
+				Format = geoParams.ExportFormat
 			};
 
 			string url = R4MEInfrastructureSettings.RapidStreetData;
 
-			ArrayList result = new ArrayList();
+			var result = new ArrayList();
 
 			if (geoParams.Pk > 0)
 			{
 				url = url + "/" + geoParams.Pk + "/";
 
-				RapidStreetResponse response = GetJsonObjectFromAPI<RapidStreetResponse>(request, url, HttpMethodType.Get, (HttpContent)null, false, out errorString);
-				Dictionary<string, string> dresult = new Dictionary<string, string>();
+				var response = GetJsonObjectFromAPI<RapidStreetResponse>(request, url, HttpMethodType.Get, (HttpContent)null, false, out errorString);
+
+				var dresult = new Dictionary<string, string>();
 
 				if ((response != null))
 				{
@@ -2856,7 +3453,7 @@ namespace Route4MeSDK
 				{
 					foreach (var resp1 in response)
 					{
-						Dictionary<string, string> dresult = new Dictionary<string, string>();
+						var dresult = new Dictionary<string, string>();
 						dresult["zipcode"] = resp1.Zipcode;
 						dresult["street_name"] = resp1.StreetName;
 						result.Add(dresult);
@@ -2875,15 +3472,15 @@ namespace Route4MeSDK
         /// <returns>An array of the street zipcodes</returns>
 		public ArrayList RapidStreetZipcode(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest
+			var request = new GeocodingRequest
 			{
 				Addresses = geoParams.Addresses,
-				Format = geoParams.Format
+				Format = geoParams.ExportFormat
 			};
 
 			string url = R4MEInfrastructureSettings.RapidStreetZipcode;
 
-			ArrayList result = new ArrayList();
+			var result = new ArrayList();
 
 			if (geoParams.Zipcode != null)
 			{
@@ -2907,7 +3504,7 @@ namespace Route4MeSDK
 			{
 				foreach (var resp1 in response)
 				{
-					Dictionary<string, string> dresult = new Dictionary<string, string>();
+					var dresult = new Dictionary<string, string>();
 					dresult["zipcode"] = resp1.Zipcode;
 					dresult["street_name"] = resp1.StreetName;
 					result.Add(dresult);
@@ -2925,15 +3522,15 @@ namespace Route4MeSDK
         /// <returns>An array of the street services</returns>
 		public ArrayList RapidStreetService(GeocodingParameters geoParams, out string errorString)
 		{
-			GeocodingRequest request = new GeocodingRequest
+			var request = new GeocodingRequest
 			{
 				Addresses = geoParams.Addresses,
-				Format = geoParams.Format
+				Format = geoParams.ExportFormat
 			};
 
 			string url = R4MEInfrastructureSettings.RapidStreetService;
 
-			ArrayList result = new ArrayList();
+			var result = new ArrayList();
 
 			if (geoParams.Zipcode != null)
 			{
@@ -2967,7 +3564,7 @@ namespace Route4MeSDK
 			{
 				foreach (var resp1 in response)
 				{
-					Dictionary<string, string> dresult = new Dictionary<string, string>();
+					var dresult = new Dictionary<string, string>();
 					dresult["zipcode"] = resp1.Zipcode;
 					dresult["street_name"] = resp1.StreetName;
 					result.Add(dresult);
@@ -2980,6 +3577,7 @@ namespace Route4MeSDK
         #endregion
 
         #region Vehicles
+
         /// <summary>
         /// Creates a vehicle
         /// </summary>
@@ -2988,7 +3586,11 @@ namespace Route4MeSDK
         /// <returns>The created vehicle </returns>
         public VehicleV4CreateResponse CreateVehicle(VehicleV4Parameters vehicle, out string errorString)
 		{
-            return GetJsonObjectFromAPI<VehicleV4CreateResponse>(vehicle, R4MEInfrastructureSettings.Vehicle_V4_API, HttpMethodType.Post, out errorString);
+            return GetJsonObjectFromAPI<VehicleV4CreateResponse>(
+                                                vehicle, 
+                                                R4MEInfrastructureSettings.Vehicle_V4_API, 
+                                                HttpMethodType.Post, 
+                                                out errorString);
 		}
 
         /// <summary>
@@ -3000,7 +3602,9 @@ namespace Route4MeSDK
         /// <returns> The VehiclesPaginated type object containing an array of the vehicles</returns>
         public VehiclesPaginated GetVehicles(VehicleParameters vehParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<VehiclesPaginated>(vehParams, R4MEInfrastructureSettings.Vehicle_V4,
+            return GetJsonObjectFromAPI<VehiclesPaginated>(
+                                                vehParams, 
+                                                R4MEInfrastructureSettings.Vehicle_V4,
 															                       HttpMethodType.Get,
 															                       out errorString);
 		}
@@ -3013,7 +3617,14 @@ namespace Route4MeSDK
         /// <returns> A vehicle </returns>
         public VehicleV4Response GetVehicle(VehicleParameters vehParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, R4MEInfrastructureSettings.Vehicle_V4,
+            if ((vehParams?.VehicleId?.Length ?? 0) != 32)
+            {
+                errorString = "The vehicle ID is not specified";
+                return null;
+            }
+
+            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, 
+                            R4MEInfrastructureSettings.Vehicle_V4 + @"/" + vehParams.VehicleId,
 															                       HttpMethodType.Get,
 															                       out errorString);
 		}
@@ -3026,8 +3637,14 @@ namespace Route4MeSDK
         /// <returns>The updated vehicle</returns>
 		public VehicleV4Response updateVehicle(VehicleV4Parameters vehParams, string vehicleId, out string errorString)
 		{
+            if ((vehicleId?.Length ?? 0) != 32)
+            {
+                errorString = "The vehicle ID is not specified";
+                return null;
+            }
 
-            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, R4MEInfrastructureSettings.Vehicle_V4+ @"/"+ vehicleId, 
+            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, 
+                            R4MEInfrastructureSettings.Vehicle_V4+ @"/"+ vehicleId, 
 															                      HttpMethodType.Put,
 															                      out errorString);
 		}
@@ -3040,24 +3657,17 @@ namespace Route4MeSDK
         /// <returns>The removed vehicle</returns>
 		public VehicleV4Response deleteVehicle(VehicleV4Parameters vehParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, R4MEInfrastructureSettings.Vehicle_V4 + "/" + vehParams.VehicleId, 
-															                      HttpMethodType.Delete,
-															                      out errorString);
+            if ((vehParams?.VehicleId?.Length ?? 0) != 32)
+            {
+                errorString = "The vehicle ID is not specified";
+                return null;
 		}
 
-        /// <summary>
-        /// Removes a vehicle from a user's account
-        /// </summary>
-        /// <param name="vehParams">The VehicleParameters type object as the query parameters containing parameter VehicleId</param>
-        /// <param name="errorString"> out: Error as string </param>
-        /// <returns>The removed vehicle</returns>
-		public VehicleV4Response deleteVehicle(VehicleParameters vehParams, out string errorString)
-		{
-            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, R4MEInfrastructureSettings.Vehicle_V4,
-															                      HttpMethodType.Get,
+            return GetJsonObjectFromAPI<VehicleV4Response>(vehParams, 
+                            R4MEInfrastructureSettings.Vehicle_V4 + "/" + vehParams.VehicleId, 
+							HttpMethodType.Delete,
 															                      out errorString);
 		}
-
 
         #endregion
 
@@ -3070,7 +3680,8 @@ namespace Route4MeSDK
         /// <returns> The Territory type object </returns>
         public TerritoryZone CreateTerritory(AvoidanceZoneParameters avoidanceZoneParameters, out string errorString)
 		{
-            return GetJsonObjectFromAPI<TerritoryZone>(avoidanceZoneParameters, R4MEInfrastructureSettings.Territory, 
+            return GetJsonObjectFromAPI<TerritoryZone>(avoidanceZoneParameters, 
+                            R4MEInfrastructureSettings.Territory, 
                                                                                 HttpMethodType.Post, 
                                                                                 out errorString);
 		}
@@ -3083,7 +3694,8 @@ namespace Route4MeSDK
         /// <returns> The teritories </returns>
         public AvoidanceZone[] GetTerritories(AvoidanceZoneQuery avoidanceZoneQuery, out string errorString)
 		{
-            return GetJsonObjectFromAPI<AvoidanceZone[]>(avoidanceZoneQuery, R4MEInfrastructureSettings.Territory, 
+            return GetJsonObjectFromAPI<AvoidanceZone[]>(avoidanceZoneQuery, 
+                            R4MEInfrastructureSettings.Territory, 
                                                                                 HttpMethodType.Get, 
                                                                                 out errorString);
 		}
@@ -3096,10 +3708,10 @@ namespace Route4MeSDK
         /// <returns> A TerritoryZone type object </returns>
         public TerritoryZone GetTerritory(TerritoryQuery territoryQuery, out string errorString)
 		{
-            return GetJsonObjectFromAPI<TerritoryZone>(territoryQuery, R4MEInfrastructureSettings.Territory, 
+            return GetJsonObjectFromAPI<TerritoryZone>(territoryQuery, 
+                            R4MEInfrastructureSettings.Territory, 
                                                                                 HttpMethodType.Get, 
                                                                                 out errorString);
-
 		}
 
         /// <summary>
@@ -3123,7 +3735,8 @@ namespace Route4MeSDK
         /// <returns> Territory Object </returns>
         public AvoidanceZone UpdateTerritory(AvoidanceZoneParameters tereritoryParameters, out string errorString)
 		{
-            return GetJsonObjectFromAPI<AvoidanceZone>(tereritoryParameters, R4MEInfrastructureSettings.Territory, 
+            return GetJsonObjectFromAPI<AvoidanceZone>(tereritoryParameters, 
+                            R4MEInfrastructureSettings.Territory, 
                                                                                 HttpMethodType.Put, 
                                                                                 out errorString);
 		}
@@ -3140,9 +3753,13 @@ namespace Route4MeSDK
         /// <returns>The telematics vendors</returns>
         public TelematicsVendorsResponse GetAllTelematicsVendors(TelematicsVendorParameters vendorParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<TelematicsVendorsResponse>(vendorParams, R4MEInfrastructureSettings.TeleamticsVendorsHost,
+            var result =  GetJsonObjectFromAPI<TelematicsVendorsResponse>(vendorParams, 
+                            R4MEInfrastructureSettings.TelematicsVendorsHost,
 															                   HttpMethodType.Get,
 															                   out errorString);
+
+            return result;
+
 		}
 
         /// <summary>
@@ -3153,7 +3770,8 @@ namespace Route4MeSDK
         /// <returns>A telematics vendor</returns>
 		public TelematicsVendorResponse GetTelematicsVendor(TelematicsVendorParameters vendorParams, out string errorString)
 		{
-            return GetJsonObjectFromAPI<TelematicsVendorResponse>(vendorParams, R4MEInfrastructureSettings.TeleamticsVendorsHost,
+            return GetJsonObjectFromAPI<TelematicsVendorResponse>(vendorParams, 
+                            R4MEInfrastructureSettings.TelematicsVendorsHost,
 															                   HttpMethodType.Get,
 															                   out errorString);
 		}
@@ -3163,13 +3781,191 @@ namespace Route4MeSDK
         /// </summary>
         /// <param name="vendorParams"> The TelematicsVendorParameters type object as query parameters </param>
         /// <param name="errorString"> out: Error as string </param>
-        /// <returns>The TelematicsVendorsSearchResponse type object containing found telematics vendors</returns>
-		public TelematicsVendorsSearchResponse SearchTelematicsVendors(TelematicsVendorParameters vendorParams, out string errorString)
+        /// <returns>The TelematicsVendorsResponse type object containing found telematics vendors</returns>
+		public TelematicsVendorsResponse SearchTelematicsVendors(TelematicsVendorParameters vendorParams, 
+                                                                 out string errorString)
 		{
-            return GetJsonObjectFromAPI<TelematicsVendorsSearchResponse>(vendorParams, R4MEInfrastructureSettings.TeleamticsVendorsHost,
+            return GetJsonObjectFromAPI<TelematicsVendorsResponse>(vendorParams, 
+                                        R4MEInfrastructureSettings.TelematicsVendorsHost,
+							            HttpMethodType.Get,
+							            out errorString);
+		}
+
+        /// <summary>
+        /// Register telematics member
+        /// </summary>
+        /// <param name="vendorParams">Parameters containing API key and member ID</param>
+        /// <param name="errorString"> out: Error as string</param>
+        /// <returns>Response with a member's API token</returns>
+        public TelematicsRegisterMemberResponse RegisterTelematicsMember(TelematicsVendorParameters vendorParams,
+                                                                         out string errorString)
+        {
+            vendorParams.PrepareForSerialization();
+
+            return GetJsonObjectFromAPI<TelematicsRegisterMemberResponse>(vendorParams,
+                                        R4MEInfrastructureSettings.TelematicsRegisterHost,
 															                   HttpMethodType.Get,
 															                   out errorString);
 		}
+
+        /// <summary>
+        /// Get all telematics connections.
+        /// </summary>
+        /// <param name="vendorParams">Parameters containing API token</param>
+        /// <param name="errorString">out: Error as string</param>
+        /// <returns>An array of the telematics connections</returns>
+        public TelematicsConnection[] GetTelematicsConnections(TelematicsVendorParameters vendorParams, out string errorString)
+        {
+            var result = GetJsonObjectFromAPI<TelematicsConnection[]>(vendorParams,
+                            R4MEInfrastructureSettings.TelematicsVendorsHost,
+                            HttpMethodType.Get,
+                            out errorString);
+
+            return result;
+
+        }
+
+        /// <summary>
+        /// Create a telematics connection.
+        /// </summary>
+        /// <param name="apiToken">API token</param>
+        /// <param name="connectionParams">Telematics connection parameters</param>
+        /// <param name="errorString">out: Error as string</param>
+        /// <returns>Created telematics connection</returns>
+        public TelematicsConnection CreateTelematicsConnection(string apiToken, 
+                                                               TelematicsConnectionParameters connectionParams,
+                                                               out string errorString
+                                                               )
+        {
+            var roParames = new GenericParameters();
+            roParames.ParametersCollection.Add("api_token", apiToken);
+
+            var keyValues = new List<KeyValuePair<string, string>>();
+
+            if (connectionParams.AccountId != null) 
+                keyValues.Add(new KeyValuePair<string, string>("account_id", connectionParams.AccountId));
+            if (connectionParams.UserName != null) 
+                keyValues.Add(new KeyValuePair<string, string>("username", connectionParams.UserName));
+            if (connectionParams.Password != null) 
+                keyValues.Add(new KeyValuePair<string, string>("password", connectionParams.Password));
+            if (connectionParams.Host != null) 
+                keyValues.Add(new KeyValuePair<string, string>("host", connectionParams.Host));
+            if (connectionParams.VendorID != null) 
+                keyValues.Add(new KeyValuePair<string, string>("vendor_id", connectionParams.VendorID.ToString()));
+            if (connectionParams.Name != null) 
+                keyValues.Add(new KeyValuePair<string, string>("name", connectionParams.Name));
+            if (connectionParams.VehiclePositionRefreshRate != null) 
+                keyValues.Add(new KeyValuePair<string, string>("vehicle_position_refresh_rate", connectionParams.VehiclePositionRefreshRate.ToString()));
+            if (connectionParams.UserId != null) 
+                keyValues.Add(new KeyValuePair<string, string>("user_id", connectionParams.UserId.ToString()));
+            if (connectionParams.ID != null) 
+                keyValues.Add(new KeyValuePair<string, string>("id", connectionParams.ID.ToString()));
+            if (connectionParams.Vendor != null) 
+                keyValues.Add(new KeyValuePair<string, string>("vendor", connectionParams.Vendor));
+            
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                TelematicsConnection response = GetJsonObjectFromAPI<TelematicsConnection>
+                    (roParames, R4MEInfrastructureSettings.TelematicsConnection,
+                    HttpMethodType.Post, httpContent, out errorString);
+
+                return response;
+            };
+        }
+
+        /// <summary>
+        /// Delete a telematics connection
+        /// </summary>
+        /// <param name="apiToken">API token</param>
+        /// <param name="connectionToken">Connection token</param>
+        /// <param name="errorString">out: Error as string</param>
+        /// <returns>Deleted telematics connection</returns>
+        public TelematicsConnection DeleteTelematicsConnection(string apiToken,
+                                                               string connectionToken,
+                                                               out string errorString)
+        {
+            var roParames = new GenericParameters();
+            roParames.ParametersCollection.Add("api_token", apiToken);
+            roParames.ParametersCollection.Add("connection_token", connectionToken);
+
+            var result = GetJsonObjectFromAPI<TelematicsConnection>(roParames,
+                            R4MEInfrastructureSettings.TelematicsConnection,
+                            HttpMethodType.Delete,
+                            out errorString);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Update telematics connection
+        /// </summary>
+        /// <param name="apiToken">API token</param>
+        /// <param name="connectionToken">Connection token</param>
+        /// <param name="connectionParams">Telematics connection parameters</param>
+        /// <param name="errorString">out: Error as string</param>
+        /// <returns>Updated telematics connection</returns>
+        public TelematicsConnection UpdateTelematicsConnection(string apiToken,
+                                                               string connectionToken,
+                                                               TelematicsConnectionParameters connectionParams,
+                                                               out string errorString)
+        {
+            var roParames = new GenericParameters();
+            roParames.ParametersCollection.Add("api_token", apiToken);
+            roParames.ParametersCollection.Add("connection_token", connectionToken);
+
+            var keyValues = new List<KeyValuePair<string, string>>();
+
+            if (connectionParams.AccountId != null)
+                keyValues.Add(new KeyValuePair<string, string>("account_id", connectionParams.AccountId));
+            if (connectionParams.UserName != null)
+                keyValues.Add(new KeyValuePair<string, string>("username", connectionParams.UserName));
+            if (connectionParams.Password != null)
+                keyValues.Add(new KeyValuePair<string, string>("password", connectionParams.Password));
+            if (connectionParams.Host != null)
+                keyValues.Add(new KeyValuePair<string, string>("host", connectionParams.Host));
+            if (connectionParams.VendorID != null)
+                keyValues.Add(new KeyValuePair<string, string>("vendor_id", connectionParams.VendorID.ToString()));
+            if (connectionParams.Name != null)
+                keyValues.Add(new KeyValuePair<string, string>("name", connectionParams.Name));
+            if (connectionParams.VehiclePositionRefreshRate != null)
+                keyValues.Add(new KeyValuePair<string, string>("vehicle_position_refresh_rate", connectionParams.VehiclePositionRefreshRate.ToString()));
+            if (connectionParams.UserId != null)
+                keyValues.Add(new KeyValuePair<string, string>("user_id", connectionParams.UserId.ToString()));
+            if (connectionParams.Vendor != null)
+                keyValues.Add(new KeyValuePair<string, string>("vendor", connectionParams.Vendor));
+
+            using (HttpContent httpContent = new FormUrlEncodedContent(keyValues))
+            {
+                TelematicsConnection response = GetJsonObjectFromAPI<TelematicsConnection>
+                    (roParames, R4MEInfrastructureSettings.TelematicsConnection,
+                    HttpMethodType.Put, httpContent, out errorString);
+
+                return response;
+            };
+        }
+
+        /// <summary>
+        /// Get a telematics connection
+        /// </summary>
+        /// <param name="apiToken">API token</param>
+        /// <param name="connectionToken">Connection token</param>
+        /// <param name="errorString">out: Error as string</param>
+        /// <returns>Telematics connection</returns>
+        public TelematicsConnection GetTelematicsConnection(string apiToken,
+                                                               string connectionToken,
+                                                               out string errorString)
+        {
+            var roParames = new GenericParameters();
+            roParames.ParametersCollection.Add("api_token", apiToken);
+            roParames.ParametersCollection.Add("connection_token", connectionToken);
+
+            var result = GetJsonObjectFromAPI<TelematicsConnection>(roParames,
+                            R4MEInfrastructureSettings.TelematicsConnection,
+                            HttpMethodType.Get,
+                            out errorString);
+
+            return result;
+        }
 
 		#endregion
 
@@ -3337,6 +4133,31 @@ namespace Route4MeSDK
 									result = isString ? streamTask.ReadString() as T :
 															streamTask.ReadObject<T>();
 								}
+                                else if (response.Content
+                                    .GetType().ToString().ToLower()
+                                    .Contains("httpconnectionresponsecontent"))
+                                {
+                                    var streamTask2 = response.Content.ReadAsStreamAsync();
+                                    streamTask2.Wait();
+
+                                    if (streamTask2.IsCompleted)
+                                    {
+                                        HttpContent content2 = response.Content;
+
+                                        if (isString)
+                                        {
+                                            result = content2.ReadAsStreamAsync().Result.ReadString() as T;
+                                        }
+                                        else
+                                        {
+                                            result = parseWithNewtonJson
+                                                ? content2.ReadAsStreamAsync().Result.ReadObjectNew<T>()
+                                                : content2.ReadAsStreamAsync().Result.ReadObject<T>();
+
+                                            parseWithNewtonJson = false;
+                                        }
+                                    }
+                                }
 								else
 								{
 									var streamTask = await ((StreamContent)response.Content).ReadAsStreamAsync();
@@ -3374,9 +4195,7 @@ namespace Route4MeSDK
 			}
 			catch (HttpListenerException e)
 			{
-				errorMessage = e is AggregateException ? e.InnerException.Message : e.Message;
-
-				errorMessage = e.Message + " --- " + errorMessage;
+				errorMessage = e.Message;
 				result = null;
 			}
 			catch (Exception e)
@@ -3404,8 +4223,18 @@ namespace Route4MeSDK
 			{
 				using (HttpClient httpClient = CreateHttpClient(url))
 				{
-					// Get the parameters
-					string parametersURI = optimizationParameters.Serialize(m_ApiKey);
+                    bool hasApiKey = (optimizationParameters
+                                        .GetType()
+                                        .GetProperties()
+                                        .Where(x => x.Name == "ApiKey" || x.Name == "api_key")
+                                        .FirstOrDefault()
+                                        ?.GetValue(optimizationParameters) ?? null) != null;
+
+                    string parametersURI = hasApiKey
+                                            ? optimizationParameters.Serialize(String.Empty) 
+                                            : optimizationParameters.Serialize(m_ApiKey);
+
+                    parametersURI = parametersURI.Replace("?&", "?");
 
 					switch (httpMethod)
 					{
@@ -3416,9 +4245,19 @@ namespace Route4MeSDK
 
 								if (response.IsCompleted)
 								{
-									result = isString ? response.Result.ReadString() as T :
-														response.Result.ReadObject<T>();
+                                    if (isString)
+                                    {
+                                        result = response.Result.ReadString() as T;
+                                    }
+                                    else
+                                    {
+                                        result = parseWithNewtonJson
+                                            ? response.Result.ReadObjectNew<T>()
+                                            : response.Result.ReadObject<T>();
+
+                                        parseWithNewtonJson = false;
 								}
+                                }
 
 								break;
 							}
@@ -3477,14 +4316,63 @@ namespace Route4MeSDK
 
 									if (streamTask.IsCompleted)
 									{
-										result = isString ? streamTask.Result.ReadString() as T :
-															streamTask.Result.ReadObject<T>();
+                                        if (isString)
+                                        {
+                                            result = streamTask.Result.ReadString() as T;
+                                        }
+                                        else
+                                        {
+                                            result = parseWithNewtonJson  
+                                                ? streamTask.Result.ReadObjectNew<T>() 
+                                                : streamTask.Result.ReadObject<T>();
+
+                                            parseWithNewtonJson = false;
 									}
 								}
+								}
+                                else if (response.IsCompleted &&
+                                    response.Result.IsSuccessStatusCode &&
+                                    response.Result.Content
+                                    .GetType().ToString().ToLower()
+                                    .Contains("httpconnectionresponsecontent"))
+                                {
+                                    var streamTask2 = response.Result.Content.ReadAsStreamAsync();
+                                    streamTask2.Wait();
+
+                                    if (streamTask2.IsCompleted)
+                                    {
+                                        HttpContent content2 = response.Result.Content;
+
+                                        if (isString)
+                                        {
+                                            result = content2.ReadAsStreamAsync().Result.ReadString() as T;
+                                        }
 								else
 								{
-									var streamTask = ((StreamContent)response.Result.Content).ReadAsStreamAsync();
-									streamTask.Wait();
+                                            result = parseWithNewtonJson 
+                                                ? content2.ReadAsStreamAsync().Result.ReadObjectNew<T>() 
+                                                : content2.ReadAsStreamAsync().Result.ReadObject<T>();
+
+                                            parseWithNewtonJson = false;
+                                        }
+                                    }
+                                }
+								else
+								{
+                                    Task<Stream> streamTask = null;
+                                    Task<string> errorMessageContent = null;
+
+                                    if (response.Result.Content.GetType() == typeof(StreamContent))
+                                        streamTask = ((StreamContent)response.Result.Content).ReadAsStreamAsync();
+                                    else 
+                                        errorMessageContent = response.Result.Content.ReadAsStringAsync();
+                                    //var streamTask = response.Result.Content.GetType() ==typeof(StreamContent) 
+                                    //    ? ((StreamContent)response.Result.Content).ReadAsStreamAsync() 
+                                    //    : response.Result.Content.ReadAsStringAsync();
+
+                                    streamTask?.Wait();
+                                    errorMessageContent?.Wait();
+
 									ErrorResponse errorResponse = null;
 									try
 									{
@@ -3496,13 +4384,17 @@ namespace Route4MeSDK
 									}
 									if (errorResponse != null && errorResponse.Errors != null && errorResponse.Errors.Count > 0)
 									{
-										foreach (String error in errorResponse.Errors)
+										foreach (var error in errorResponse.Errors)
 										{
 											if (errorMessage.Length > 0)
 												errorMessage += "; ";
 											errorMessage += error;
 										}
 									}
+                                    else if (errorMessageContent!=null)
+                                    {
+                                        errorMessage += errorMessageContent.Result;
+                                    }
 									else
 									{
 										var responseStream = response.Result.Content.ReadAsStringAsync();
@@ -3701,7 +4593,8 @@ namespace Route4MeSDK
 			Console.WriteLine("Supports redirection -> " + supportsAutoRdirect);
 			*/
 
-			ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
+            //ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)768 | (SecurityProtocolType)3072 | (SecurityProtocolType)12288;
 
             HttpClientHandler handler = new HttpClientHandler();
             handler.Proxy = new WebProxy("127.0.0.1", 8888);
@@ -3724,7 +4617,8 @@ namespace Route4MeSDK
 
 			var supprotsAutoRdirect = handler.SupportsAutomaticDecompression;
 
-			ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
+            //ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)768 | (SecurityProtocolType)3072 | (SecurityProtocolType)12288;
 			HttpClient result = new HttpClient(handler) { BaseAddress = new Uri(url) };
 
 			result.Timeout = m_DefaultTimeOut;

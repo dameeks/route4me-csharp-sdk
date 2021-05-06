@@ -1,191 +1,433 @@
-﻿using Route4MeSDK.DataTypes;
-using Route4MeSDK.Examples;
+﻿using Route4MeSDK.Examples;
 using System;
-using System.Collections.Generic;
+using NUnit.Framework;
 
 namespace Route4MeSDKTest
 {
-  internal sealed class Program
-  {
-    static void Main(string[] args)
+    [TestFixture]
+    public class DumbTest
     {
-      Route4MeExamples examples = new Route4MeExamples();
-
-      DataObject dataObject = null;
-
-      DataObject dataObject1 = examples.SingleDriverRoute10Stops();
-      dataObject = dataObject1;
-      string routeId_SingleDriverRoute10Stops = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      int[] destinationIds = examples.AddRouteDestinations(routeId_SingleDriverRoute10Stops);
-      if (destinationIds != null && destinationIds.Length > 0)
-      {
-        examples.RemoveRouteDestination(routeId_SingleDriverRoute10Stops, destinationIds[0]);
-      }
-
-      DataObject dataObject2 = examples.SingleDriverRoundTrip();
-      dataObject = dataObject2;
-      string routeId_SingleDriverRoundTrip = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      string routeIdToMoveTo = routeId_SingleDriverRoundTrip;
-      int routeDestinationIdToMove = (dataObject1 != null && dataObject1.Routes != null && dataObject1.Routes.Length > 0 && dataObject1.Routes[0].Addresses.Length > 1 && dataObject1.Routes[0].Addresses[1].RouteDestinationId != null) ? dataObject1.Routes[0].Addresses[1].RouteDestinationId.Value : 0;
-      int afterDestinationIdToMoveAfter = (dataObject2 != null && dataObject2.Routes != null && dataObject2.Routes.Length > 0 && dataObject2.Routes[0].Addresses.Length > 1 && dataObject2.Routes[0].Addresses[0].RouteDestinationId != null) ? dataObject2.Routes[0].Addresses[0].RouteDestinationId.Value : 0;
-      if (routeIdToMoveTo != null && routeDestinationIdToMove != 0 && afterDestinationIdToMoveAfter != 0)
-      {
-        examples.MoveDestinationToRoute(routeIdToMoveTo, routeDestinationIdToMove, afterDestinationIdToMoveAfter);
-      }
-      else
-      {
-        System.Console.WriteLine("MoveDestinationToRoute not called. routeDestinationId = {0}, afterDestinationId = {1}.", routeDestinationIdToMove, afterDestinationIdToMoveAfter);
-      }
-
-      string optimizationProblemID = examples.SingleDriverRoundTripGeneric();
-
-      dataObject = examples.MultipleDepotMultipleDriver();
-      string routeId_MultipleDepotMultipleDriver = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      dataObject = examples.MultipleDepotMultipleDriverTimeWindow();
-      string routeId_MultipleDepotMultipleDriverTimeWindow = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      dataObject = examples.SingleDepotMultipleDriverNoTimeWindow();
-      string routeId_SingleDepotMultipleDriverNoTimeWindow = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      dataObject = examples.MultipleDepotMultipleDriverWith24StopsTimeWindow();
-      string routeId_MultipleDepotMultipleDriverWith24StopsTimeWindow = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      dataObject = examples.SingleDriverMultipleTimeWindows();
-      string routeId_SingleDriverMultipleTimeWindows = (dataObject != null && dataObject.Routes != null && dataObject.Routes.Length > 0) ? dataObject.Routes[0].RouteID : null;
-
-      if (optimizationProblemID != null)
-        examples.GetOptimization(optimizationProblemID);
-      else
-        System.Console.WriteLine("GetOptimization not called. optimizationProblemID == null.");
-      
-      examples.GetOptimizations();
-
-      if (optimizationProblemID != null)
-        examples.AddDestinationToOptimization(optimizationProblemID, true);
-      else
-        System.Console.WriteLine("AddDestinationToOptimization not called. optimizationProblemID == null.");
-
-      if (optimizationProblemID != null)
-        examples.ReOptimization(optimizationProblemID);
-      else
-        System.Console.WriteLine("ReOptimization not called. optimizationProblemID == null.");
-
-      if (routeId_SingleDriverRoute10Stops != null)
-      {
-        examples.UpdateRoute(routeId_SingleDriverRoute10Stops);
-        examples.ReoptimizeRoute(routeId_SingleDriverRoute10Stops);
-        examples.GetRoute(routeId_SingleDriverRoute10Stops);
-      }
-      else
-      {
-        System.Console.WriteLine("UpdateRoute, ReoptimizeRoute, GetRoute not called. routeId_SingleDriverRoute10Stops == null.");
-      }
-
-      examples.GetRoutes();
-      examples.GetUsers();
-
-      if (routeId_SingleDriverRoute10Stops != null)
-        examples.GetActivities(routeId_SingleDriverRoute10Stops);
-      else
-        System.Console.WriteLine("GetActivities not called. routeId_SingleDriverRoute10Stops == null.");
-
-      if (routeIdToMoveTo != null && routeDestinationIdToMove != 0)
-      {
-        examples.GetAddress(routeIdToMoveTo, routeDestinationIdToMove);
-
-        examples.AddAddressNote(routeIdToMoveTo, routeDestinationIdToMove);
-        examples.GetAddressNotes(routeIdToMoveTo, routeDestinationIdToMove);
-      }
-      else
-      {
-        System.Console.WriteLine("AddAddressNote, GetAddress, GetAddressNotes not called. routeIdToMoveTo == null || routeDestinationIdToMove == 0.");
-      }
-
-      string routeId_DuplicateRoute = null;
-      if (routeId_SingleDriverRoute10Stops != null)
-        routeId_DuplicateRoute = examples.DuplicateRoute(routeId_SingleDriverRoute10Stops);
-      else
-        System.Console.WriteLine("DuplicateRoute not called. routeId_SingleDriverRoute10Stops == null.");
-
-      //disabled by default, not necessary for optimization tests
-      //not all accounts are capable of storing gps data
-      /*if (routeId_SingleDriverRoute10Stops != null)
-      {
-        examples.SetGPSPosition(routeId_SingleDriverRoute10Stops);
-        examples.TrackDeviceLastLocationHistory(routeId_SingleDriverRoute10Stops);
-      }
-      else
-      {
-        System.Console.WriteLine("SetGPSPosition, TrackDeviceLastLocationHistory not called. routeId_SingleDriverRoute10Stops == null.");
-      }*/
-
-      List<string> routeIdsToDelete = new List<string>();
-      if (routeId_SingleDriverRoute10Stops != null)
-        routeIdsToDelete.Add(routeId_SingleDriverRoute10Stops);
-      if (routeId_SingleDriverRoundTrip != null)
-        routeIdsToDelete.Add(routeId_SingleDriverRoundTrip);
-      if (routeId_DuplicateRoute != null)
-        routeIdsToDelete.Add(routeId_DuplicateRoute);
-      if (routeId_MultipleDepotMultipleDriver != null)
-        routeIdsToDelete.Add(routeId_MultipleDepotMultipleDriver);
-      if (routeId_MultipleDepotMultipleDriverTimeWindow != null)
-        routeIdsToDelete.Add(routeId_MultipleDepotMultipleDriverTimeWindow);
-      if (routeId_SingleDepotMultipleDriverNoTimeWindow != null)
-        routeIdsToDelete.Add(routeId_SingleDepotMultipleDriverNoTimeWindow);
-      if (routeId_MultipleDepotMultipleDriverWith24StopsTimeWindow != null)
-        routeIdsToDelete.Add(routeId_MultipleDepotMultipleDriverWith24StopsTimeWindow);
-      if (routeId_SingleDriverMultipleTimeWindows != null)
-        routeIdsToDelete.Add(routeId_SingleDriverMultipleTimeWindows);
-
-      if (routeIdsToDelete.Count > 0)
-        examples.DeleteRoutes(routeIdsToDelete.ToArray());
-      else
-        System.Console.WriteLine("routeIdsToDelete.Count == 0. DeleteRoutes not called.");
-
-      AddressBookContact contact1 = examples.AddAddressBookContact();
-      AddressBookContact contact2 = examples.AddAddressBookContact();
-      examples.GetAddressBookContacts();
-      if (contact1 != null)
-      {
-        contact1.last_name = "Updated " + (new Random()).Next().ToString();
-        examples.UpdateAddressBookContact(contact1);
-      }
-      else
-      {
-        System.Console.WriteLine("contact1 == null. UpdateAddressBookContact not called.");
-      }
-      List<string> addressIdsToRemove = new List<string>();
-      if (contact1 != null)
-        addressIdsToRemove.Add(contact1.address_id.ToString());
-      if (contact2 != null)
-        addressIdsToRemove.Add(contact2.address_id.ToString());
-      examples.RemoveAddressBookContacts(addressIdsToRemove.ToArray());
-
-      // Avoidance Zones
-      string territoryId = examples.AddAvoidanceZone();
-      examples.GetAvoidanceZones();
-      if (territoryId != null)
-        examples.GetAvoidanceZone(territoryId);
-      else
-        System.Console.WriteLine("GetAvoidanceZone not called. territoryId == null.");
-      if (territoryId != null)
-        examples.UpdateAvoidanceZone(territoryId);
-      else
-        System.Console.WriteLine("UpdateAvoidanceZone not called. territoryId == null.");
-      if (territoryId != null)
-        examples.DeleteAvoidanceZone(territoryId);
-      else
-        System.Console.WriteLine("DeleteAvoidanceZone not called. territoryId == null.");
-
-      examples.GenericExample();
-      examples.GenericExampleShortcut();
-
-      System.Console.WriteLine("");
-      System.Console.WriteLine("Press any key");
-      System.Console.ReadKey();
+        [Test]
+        public void TestNothing()
+        {
+            Assert.That(true, Is.True);
+        }
     }
-  }
+
+    internal sealed class Program
+    {
+        static void Main(string[] args)
+        {
+            var examples = new Route4MeExamples();
+
+            // Available values for the variable executeOption:
+            // "api4" - execute all the examples related to the API 4 
+            // "api5" - execute all the examples related to the API 5 
+            // a method name - execute a specifed example method (e.g. "GetTeamMemberById")
+            string executeOption = "ReoptimizeRemainingStops";
+
+            if (executeOption.ToLower() == "api4")
+            {
+                #region API 4
+
+                #region ==== Optimizations =====
+
+                examples.GetOptimization();
+                examples.GetOptimizationsByText();
+                examples.GetOptimizationsFromDateRange();
+                examples.OptimizationWithCallbackUrl();
+                examples.GetOptimizations();
+                examples.ReOptimization();
+                examples.RemoveOptimization();
+                examples.UpdateOptimizationDestination();
+
+                examples.ExampleOptimization();
+                examples.SingleDriverRoute7Stops();
+                examples.SingleDriverRoundTripGeneric();
+
+                examples.HybridOptimizationFrom1000Orders();
+                examples.HybridOptimizationFrom1000Addresses();
+
+                var dataobject = examples.AsyncMultipleDepotMultipleDriver().GetAwaiter().GetResult();
+
+                #endregion
+
+                #region Route Examples
+
+                examples.BundledAddresses();
+                examples.GetScheduleCalendar();
+                examples.MultipleDepotMultipleDriverFineTuning();
+                examples.MultipleDepotMultipleDriver();
+                examples.MultipleDepotMultipleDriverTimeWindow();
+                examples.MultipleDepotMultipleDriverWith24StopsTimeWindow();
+                examples.MultipleSeparateDepostMultipleDriver();
+                examples.Route300Stops();
+                examples.SingleDriverRoute10Stops();
+                examples.RouteSlowdown();
+                examples.SingleDriverRoundTrip();
+                examples.SingleDepotMultipleDriverNoTimeWindow();
+                examples.SingleDriverMultipleTimeWindows();
+                examples.SingleDriverRoundTripGeneric();
+
+                #endregion
+
+                #region ==== Route Addresses =====
+
+                examples.MoveDestinationToRoute();
+                examples.AddDestinationToOptimization();
+                examples.UpdateRouteDestination();
+                examples.AddRouteDestinations();
+                examples.GetAddress();
+
+                examples.MarkAddressAsMarkedAsDeparted();
+                examples.MarkAddressAsMarkedAsVisited();
+                examples.MarkAddressDeparted();
+                examples.MarkAddressVisited();
+
+                examples.RemoveDestinationFromOptimization();
+                examples.RemoveRouteDestination();
+                examples.ResequenceRouteDestinations();
+
+                examples.AddRouteDestinationInSpecificPosition();
+
+                #endregion
+
+                #region ==== Address Notes ====
+
+                examples.AddAddressNote();
+                examples.AddAddressNoteWithFile();
+                examples.AddComplexAddressNote();
+                examples.AddCustomNoteToRoute();
+                examples.AddCustomNoteType();
+                examples.GetAddressNotes();
+                examples.GetAllCustomNoteTypes();
+                examples.RemoveCustomNoteType();
+
+                #endregion
+
+                #region ==== Routes ====
+
+                examples.AssignMemberToRoute();
+                examples.AssignVehicleToRoute();
+                examples.ChangeRouteDepote();
+                examples.DeleteRoutes();
+                examples.DuplicateRoute();
+                examples.GetRouteDirections();
+                examples.GetRoutePathPoints();
+                examples.GetRoute();
+                examples.GetRoutesByIDs();
+                examples.GetRoutesFromDateRange();
+                examples.GetRoutes();
+                examples.ReoptimizeRoute();
+                examples.ResequenceReoptimizeRoute();
+                examples.ResequenceRouteDestinations();
+                examples.ReoptimizeRemainingStops();
+                examples.RouteOriginParameter();
+                examples.ShareRoute();
+                examples.UnlinkRouteFromOptimization();
+                examples.UpdateRouteAvoidanceZones();
+                examples.UpdateRouteCustomData();
+                examples.UpdateRoute();
+                examples.UpdateRouteDestination();
+                examples.UpdateWholeRoute();
+                examples.SearchRoutesForText();
+                examples.MergeRoutes();
+
+                #endregion
+
+                #region ==== Activities ====
+
+                examples.GetActivities();
+                examples.GetActivitiesByMember();
+                examples.GetRouteTeamActivities();
+                examples.GetLastActivities();
+                examples.LogCustomActivity();
+                examples.SearchAreaUpdated();
+                examples.SearchAreaAdded();
+                examples.SearchAreaRemoved();
+                examples.SearchDestinationDeleted();
+                examples.SearchDestinationInserted();
+                examples.SearchDestinationMarkedAsDeparted();
+                examples.SearchDestinationOutSequence();
+                examples.SearchDestinationUpdated();
+                examples.SearchDriverArrivedEarly();
+                examples.SearchDriverArrivedLate();
+                examples.SearchDriverArrivedOnTime();
+                examples.SearchGeofenceEntered();
+                examples.SearchGeofenceLeft();
+                examples.SearchInsertDestinationAll();
+                examples.SearchMarkDestinationDepartedAll();
+                examples.SearchMarkDestinationVisited();
+                examples.SearchMemberCreated();
+                examples.SearchMemberDeleted();
+                examples.SearchMemberModified();
+                examples.SearchMoveDestination();
+                examples.SearchNoteInserted();
+                examples.SearchNoteInsertedAll();
+                examples.SearchRouteDeleted();
+                examples.SearchRouteOptimized();
+                examples.SearchRouteOwnerChanged();
+
+                examples.GetRouteTeamActivities();
+                examples.SearchAreaAdded();
+
+                #endregion
+
+                #region ==== DataBase ====
+                // ======== COnverting XML file to JSON string ================
+                //    examples.convertXMLtoJSON();
+                //
+
+                // ======== Generating the SQL server tables ================
+                //examples.GenerateSqlDatabase(DB_Type.MySQL);
+                //examples.GenerateSqlDatabase(DB_Type.MSSQL);
+                //examples.GenerateSqlDatabase(DB_Type.PostgreSQL);
+                //
+
+                // ======== Upload orders csv file to the SQL server ================
+                //examples.UploadCsvToOrders(DB_Type.MySQL);
+                //examples.UploadCsvToOrders(DB_Type.MSSQL);
+                //examples.UploadCsvToOrders(DB_Type.PostgreSQL);
+                //
+
+                // ======== Upload orders JSON file to the SQL server =============================
+                //examples.UploadOrdersJSONtoSQL(DB_Type.MySQL);
+                //examples.UploadOrdersJSONtoSQL(DB_Type.MSSQL);
+                //examples.UploadOrdersJSONtoSQL(DB_Type.PostgreSQL);
+                //
+
+                // ======== Upload addressbook loactions JSON file to the SQL server ==========
+                //examples.UploadAddressbookJSONtoSQL(DB_Type.SQLCE);
+                //examples.UploadAddressbookJSONtoSQL(DB_Type.MSSQL);
+                //examples.UploadAddressbookJSONtoSQL(DB_Type.PostgreSQL);
+                //
+
+                // ======== Upload addressbook loactions csv file to the SQL server ================
+                //examples.UploadCsvToAddressbookV4(DB_Type.MySQL);
+                //examples.UploadCsvToAddressbookV4(DB_Type.MSSQL);
+                //examples.UploadCsvToAddressbookV4(DB_Type.PostgreSQL);
+                //
+
+                // ======== Export SQL server addressbook_v4 table to csv file =======================
+                //examples.MakeAddressbookCSVsample(DB_Type.MySQL);
+                //examples.MakeAddressbookCSVsample(DB_Type.MySQL);
+                //examples.MakeAddressbookCSVsample(DB_Type.MySQL);
+                //
+
+
+                #endregion
+
+                #region ==== Address Book Contacts ====
+
+                examples.AddAddressBookContact();
+                examples.AddScheduledAddressBookContact();
+                examples.GetAddressBookContacts();
+                examples.SearchLocationsByText();
+
+                examples.AddAddressBookContact();
+                examples.UpdateAddressBookContact();
+                examples.UpdateWholeAddressBookContact();
+
+                examples.SearchRoutedLocations();
+                examples.SearchLocationsByIDs();
+                examples.RemoveAddressBookContacts();
+                examples.GetSpecifiedFieldsSearchText();
+
+                #endregion
+
+                #region ==== Address Book Groups ====
+
+                examples.AddAddressBookGroup();
+                examples.GetAddressBookContactsByGroup();
+                examples.GetAddressBookGroup();
+                examples.GetAddressBookGroups();
+                examples.RemoveAddressBookGroup();
+                examples.SearchAddressBookContactsByFilter();
+                examples.UpdateAddressBookGroup();
+
+                #endregion
+
+                #region ==== User Configuration ====
+
+                examples.AddNewConfigurationKey();
+                examples.AddConfigurationKeyArray();
+                examples.GetAllConfigurationData();
+                examples.GetSpecificConfigurationKeyData();
+                examples.RemoveConfigurationKey();
+                examples.UpdateConfigurationKey();
+
+                #endregion
+
+                #region ==== Territories ====
+
+                examples.UpdateTerritory();
+                examples.RemoveTerritory();
+                examples.GetTerritory();
+                examples.GetTerritories();
+                examples.CreateRectTerritory();
+                examples.CreatePolygonTerritory();
+                examples.CreateTerritory();
+
+                #endregion
+
+                #region ==== Avoidance Zones ====
+
+                examples.AddAvoidanceZone();
+                examples.AddPolygonAvoidanceZone();
+                examples.AddRectAvoidanceZone();
+                examples.DeleteAvoidanceZone();
+                examples.GetAvoidanceZone();
+                examples.GetAvoidanceZones();
+                examples.UpdateAvoidanceZone();
+
+                #endregion
+
+                #region ==== Vehicles ====
+
+                examples.GetVehicles();
+                examples.CreatetVehicle();
+                examples.DeleteVehicle();
+                examples.GetVehicle();
+                examples.UpdateVehicle();
+
+                #endregion
+
+                #region ==== Users ====
+
+                examples.AddEditCustomDataToUser();
+                examples.CreateUser();
+                examples.DeleteUser();
+                examples.GetUserById();
+                examples.GetUsers();
+                examples.UpdateUser();
+                examples.UserAuthentication();
+                examples.UserRegistration();
+                examples.ValidateSession();
+
+                #endregion
+
+                #region ==== Tracking ====
+
+                examples.FindAsset();
+                examples.GetAllUserLocations();
+                examples.GetDeviceHistoryTimeRange();
+                examples.QueryUserLocations();
+                examples.SetGPSPosition();
+                examples.TrackDeviceLastLocationHistory();
+
+                #endregion
+
+                #region ==== Geocoding ====
+
+                examples.GeocodingForward();
+                examples.BatchGeocodingForward();
+                examples.BatchGeocodingForwardAsync();
+                examples.ReverseGeocoding();
+                examples.uploadAndGeocodeLargeJsonFile();
+
+                examples.RapidStreetDataAll();
+                examples.RapidStreetDataLimited();
+                examples.RapidStreetDataSingle();
+
+                examples.RapidStreetServiceAll();
+                examples.RapidStreetServiceLimited();
+
+                examples.RapidStreetZipcodeAll();
+                examples.RapidStreetZipcodeLimited();
+
+                #endregion
+
+                #region ==== Orders ====
+
+                examples.AddOrder();
+                examples.AddOrdersToOptimization();
+                examples.AddOrdersToRoute();
+                examples.AddScheduledOrder();
+                examples.CreateOrderWithCustomField();
+
+                examples.GetOrderByID();
+                examples.GetOrdersByInsertedDate();
+                examples.GetOrdersByScheduledDate();
+                examples.GetOrdersByCustomFields();
+                examples.GetOrdersByScheduleFilter();
+                examples.GetOrdersBySpecifiedText();
+                examples.GetOrders();
+
+                examples.RemoveOrders();
+                
+                examples.UpdateOrder();
+                examples.UpdateOrderWithCustomField();
+
+                #endregion
+
+                #region ==== Custom User Order Fields ====
+
+                examples.CreateOrderCustomUserField();
+                examples.GetOrderCustomUserFields();
+                examples.RemoveOrderCustomUserField();
+                examples.updateOrderCustomUserField();
+
+                #endregion
+
+                #region ==== Telematics Vendors ====
+
+                examples.GetAllVendors();
+                examples.GetVendor();
+                examples.SearchVendors();
+                examples.VendorsComparison();
+
+                #endregion
+
+                #endregion
+            }
+            else if (executeOption.ToLower() == "api5")
+            {
+                #region API 5
+
+                #region Team Management
+
+                examples.GetTeamMembers();
+                examples.GetTeamMemberById();
+                examples.RemoveTeamMember();
+                examples.UpdateTeamMember();
+                examples.CreateTeamMember();
+                examples.BulkCreateTeamMembers();
+                examples.AddSkillsToDriver();
+
+                #endregion
+
+                #region Driver Rating
+
+                examples.GetDriverReviewList();
+                examples.GetDriverReviewById();
+                examples.CreateDriverReview();
+                examples.UpdateDriverReview();
+
+                #endregion
+
+                #region Route Types
+
+                examples.CreateOptimizationWithDriverSkills();
+
+                #endregion
+
+                #endregion
+            }
+            else // for a specifed example method
+            {
+                try
+                {
+                    typeof(Route4MeExamples).GetMethod(executeOption).Invoke(examples,null);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(executeOption + " error: {0}", ex.Message);
+                }
+            }
+
+            System.Console.WriteLine("");
+            System.Console.WriteLine("Press any key");
+            System.Console.ReadKey();
+        }
+    }
 }

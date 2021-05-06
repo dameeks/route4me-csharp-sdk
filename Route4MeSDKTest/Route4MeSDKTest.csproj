@@ -56,20 +56,41 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Data.OracleClient" />
     <Reference Include="System.Data.SqlServerCe, Version=4.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.SqlServer.Compact.4.0.8876.1\lib\net40\System.Data.SqlServerCe.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Net" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Security.AccessControl, Version=4.1.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.AccessControl.4.7.0\lib\net461\System.Security.AccessControl.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Permissions, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Permissions.4.7.0\lib\net461\System.Security.Permissions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Security.Principal.Windows, Version=4.1.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Security.Principal.Windows.4.7.0\lib\net461\System.Security.Principal.Windows.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net461\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml" />
     <Reference Include="nunit.framework">
       <HintPath>..\packages\NUnit.3.6.0\lib\net45\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Examples\Activities\GetActivitiesByMember.cs" />
+    <Compile Include="Examples\Activities\GetLastActivities.cs" />
     <Compile Include="Examples\Activities\SearcAreaUpdated.cs" />
     <Compile Include="Examples\Activities\SearchAreaRemoved.cs" />
     <Compile Include="Examples\Activities\SearchDestinationOutSequence.cs" />
@@ -97,21 +118,91 @@
     <Compile Include="Examples\Activities\LogCustomActivity.cs" />
     <Compile Include="Examples\Activities\SearchAreaAdded.cs" />
     <Compile Include="Examples\Activities\SearchDestinationDeleted.cs" />
+    <Compile Include="Examples\AddressBookGroup\AddAddressBookGroup.cs" />
+    <Compile Include="Examples\AddressBookGroup\GetAddressBookContactsByGroup.cs" />
+    <Compile Include="Examples\AddressBookGroup\GetAddressBookGroup.cs" />
+    <Compile Include="Examples\AddressBookGroup\GetAddressBookGroups.cs" />
+    <Compile Include="Examples\AddressBookGroup\RemoveAddressBookGroup.cs" />
+    <Compile Include="Examples\AddressBookGroup\SearchAddressBookContactsByFilter.cs" />
+    <Compile Include="Examples\AddressBookGroup\UpdateAddressBookGroup.cs" />
     <Compile Include="Examples\AddressBook\AddAddressBookContact.cs" />
     <Compile Include="Examples\AddressBook\AddScheduledAddressBookContact.cs" />
-    <Compile Include="Examples\AddressBook\GetAddressbookLocation.cs" />
+    <Compile Include="Examples\AddressBook\SearchLocationsByText.cs" />
     <Compile Include="Examples\AddressBook\GetSpecifiedFieldsSearchText.cs" />
     <Compile Include="Examples\AddressBook\SearchLocationsByIDs.cs" />
     <Compile Include="Examples\AddressBook\SearchRoutedLocations.cs" />
+    <Compile Include="Examples\AddressBook\UpdateWholeAddressBookContact.cs" />
+    <Compile Include="Examples\Addresses\AddRouteDestinationInSpecificPosition.cs" />
     <Compile Include="Examples\Addresses\MarkAddressAsMarkedAsDeparted.cs" />
     <Compile Include="Examples\Addresses\MarkAddressAsMarkedAsVisited.cs" />
     <Compile Include="Examples\Addresses\MarkAddressDeparted.cs" />
     <Compile Include="Examples\Addresses\MarkAddressVisited.cs" />
     <Compile Include="Examples\Addresses\RemoveDestinationFromOptimization.cs" />
     <Compile Include="Examples\Addresses\ResequenceRouteDestinations.cs" />
+    <Compile Include="Examples\API5\DriverReview\CreateDriverReview.cs" />
+    <Compile Include="Examples\API5\DriverReview\GetDriverReviewById.cs" />
+    <Compile Include="Examples\API5\DriverReview\GetDriverReviewList.cs" />
+    <Compile Include="Examples\API5\DriverReview\UpdateDriverReview.cs" />
+    <Compile Include="Examples\API5\RouteTypes\CreateOptimizationWithDriverSkills.cs" />
+    <Compile Include="Examples\API5\TeamManagement\AddSkillsToDriver.cs" />
+    <Compile Include="Examples\API5\TeamManagement\BulkCreateTeamMembers.cs" />
+    <Compile Include="Examples\API5\TeamManagement\CreateTeamMember.cs" />
+    <Compile Include="Examples\API5\TeamManagement\GetTeamMemberById.cs" />
+    <Compile Include="Examples\API5\TeamManagement\GetTeamMembers.cs" />
+    <Compile Include="Examples\API5\TeamManagement\RemoveTeamMember.cs" />
+    <Compile Include="Examples\API5\TeamManagement\UpdateTeamMember.cs" />
     <Compile Include="Examples\AvoidanceZones\AddPolygonAvoidanceZone.cs" />
     <Compile Include="Examples\AvoidanceZones\AddRectAvoidanceZone.cs" />
+    <Compile Include="Examples\ExamplesInfrastructureV5.cs" />
+    <Compile Include="Examples\Geocoding\BatchGeocodingForward.cs" />
+    <Compile Include="Examples\Geocoding\BatchGeocodingForwardAsync.cs" />
+    <Compile Include="Examples\Geocoding\uploadAndGeocodeLargeJsonFile.cs" />
+    <Compile Include="Examples\MemberConfiguration\AddConfigurationKeyArray.cs" />
+    <Compile Include="Examples\Notes\AddComplexAddressNote.cs" />
+    <Compile Include="Examples\Notes\AddCustomNoteToRoute.cs" />
+    <Compile Include="Examples\Notes\AddCustomNoteType.cs" />
+    <Compile Include="Examples\Notes\GetAllCustomNoteTypes.cs" />
+    <Compile Include="Examples\Notes\RemoveCustomNoteType.cs" />
+    <Compile Include="Examples\Optimizations\GetOptimizationsByText.cs" />
+    <Compile Include="Examples\Optimizations\GetOptimizationsFromDateRange.cs" />
+    <Compile Include="Examples\Optimizations\UpdateOptimizationDestination.cs" />
+    <Compile Include="Examples\OrderCustomUserFields\CreateOrderCustomUserField.cs" />
+    <Compile Include="Examples\OrderCustomUserFields\GetOrderCustomUserFields.cs" />
+    <Compile Include="Examples\OrderCustomUserFields\RemoveOrderCustomUserField.cs" />
+    <Compile Include="Examples\OrderCustomUserFields\UpdateOrderCustomUserField.cs" />
+    <Compile Include="Examples\Orders\CreateOrderWithCustomField.cs" />
+    <Compile Include="Examples\Orders\GetOrdersByInsertedDate.cs" />
+    <Compile Include="Examples\Orders\GetOrdersByScheduleFilter.cs" />
+    <Compile Include="Examples\Orders\UpdateOrderWithCustomField.cs" />
     <Compile Include="Examples\RouteExamples\AsyncMultipleDepotMultipleDriver.cs" />
+    <Compile Include="Examples\RouteExamples\BundledAddresses.cs" />
+    <Compile Include="Examples\RouteExamples\ExampleOptimization.cs" />
+    <Compile Include="Examples\RouteExamples\GetScheduleCalendar.cs" />
+    <Compile Include="Examples\RouteExamples\MultipleDepotMultipleDriverFineTuning.cs" />
+    <Compile Include="Examples\RouteExamples\MultipleSeparateDepostMultipleDriver.cs" />
+    <Compile Include="Examples\RouteExamples\Route300Stops.cs" />
+    <Compile Include="Examples\RouteExamples\RouteSlowdown.cs" />
+    <Compile Include="Examples\Routes\AssignMemberToRoute.cs" />
+    <Compile Include="Examples\Routes\AssignVehicleToRoute.cs" />
+    <Compile Include="Examples\Routes\ChangeRouteDepote.cs" />
+    <Compile Include="Examples\Routes\GetRouteDirections.cs" />
+    <Compile Include="Examples\Routes\GetRoutePathPoints.cs" />
+    <Compile Include="Examples\Routes\GetRoutesByIDs.cs" />
+    <Compile Include="Examples\Routes\GetRoutesFromDateRange.cs" />
+    <Compile Include="Examples\Routes\ReoptimizeRemainingStops.cs" />
+    <Compile Include="Examples\Routes\ResequenceRouteDestinations.cs" />
+    <Compile Include="Examples\Routes\RouteOriginParameter.cs" />
+    <Compile Include="Examples\Routes\ShareRoute.cs" />
+    <Compile Include="Examples\Routes\UnlinkRouteFromOptimization.cs" />
+    <Compile Include="Examples\Routes\UpdateRouteAvoidanceZones.cs" />
+    <Compile Include="Examples\Routes\UpdateWholeRoute.cs" />
+    <Compile Include="Examples\TelematicsGateWayAPI\GetAllVendors.cs" />
+    <Compile Include="Examples\TelematicsGateWayAPI\GetVendor.cs" />
+    <Compile Include="Examples\TelematicsGateWayAPI\SearchVendors.cs" />
+    <Compile Include="Examples\TelematicsGateWayAPI\VendorsComparison.cs" />
+    <Compile Include="Examples\Tracking\GetAllUserLocations.cs" />
+    <Compile Include="Examples\Tracking\QueryUserLocations.cs" />
+    <Compile Include="Examples\Users\AddEditCustomDataToUser.cs" />
     <Compile Include="Examples\Users\CreateUser.cs" />
     <Compile Include="Examples\Databases\GenerateSqlDatabase.cs" />
     <Compile Include="Examples\Databases\MakeAddressbookCSVsample.cs" />
@@ -151,8 +242,7 @@
     <Compile Include="Examples\Orders\AddOrdersToRoute.cs" />
     <Compile Include="Examples\Orders\AddScheduledOrders.cs" />
     <Compile Include="Examples\Orders\GetOrderByID.cs" />
-    <Compile Include="Examples\Orders\GetOrderByInsertedDate.cs" />
-    <Compile Include="Examples\Orders\GetOrderByScheduledDate.cs" />
+    <Compile Include="Examples\Orders\GetOrdersByScheduledDate.cs" />
     <Compile Include="Examples\Orders\GetOrdersByCustomFields.cs" />
     <Compile Include="Examples\Orders\GetOrdersBySpecifiedText.cs" />
     <Compile Include="Examples\Orders\RemoveOrders.cs" />
@@ -185,7 +275,6 @@
     <Compile Include="Examples\Routes\MergeRoutes.cs" />
     <Compile Include="Examples\Routes\ReoptimizeRoute.cs" />
     <Compile Include="Examples\Routes\ResequenceReoptimizeRoute.cs" />
-    <Compile Include="Examples\Routes\RouteSharing.cs" />
     <Compile Include="Examples\Routes\SearchRoutesForText.cs" />
     <Compile Include="Examples\Routes\UpdateRoute.cs" />
     <Compile Include="Examples\Routes\UpdateRouteCustomData.cs" />
@@ -210,7 +299,11 @@
     <Compile Include="Examples\Users\UserAuthentication.cs" />
     <Compile Include="Examples\Users\UserRegistration.cs" />
     <Compile Include="Examples\Users\ValidateSession.cs" />
+    <Compile Include="Examples\Vehicles\CreatetVehicle.cs" />
+    <Compile Include="Examples\Vehicles\DeleteVehicle.cs" />
+    <Compile Include="Examples\Vehicles\GetVehicle.cs" />
     <Compile Include="Examples\Vehicles\GetVehicles.cs" />
+    <Compile Include="Examples\Vehicles\UpdateVehicle.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -221,6 +314,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Route4MeSDKLibrary\Route4MeSDKLibrary.csproj">
@@ -229,12 +323,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\test.png" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Resources\test.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -254,6 +349,7 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

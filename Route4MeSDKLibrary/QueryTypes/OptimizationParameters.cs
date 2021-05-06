@@ -52,17 +52,42 @@ namespace Route4MeSDK.QueryTypes
         [HttpQueryMemberAttribute(Name = "end_date", EmitDefaultValue = false)]
         public string EndDate { get; set; }
 
+        [IgnoreDataMember]
+        [HttpQueryMemberAttribute(Name = "query", EmitDefaultValue = false)]
+        public string Query { get; set; }
+
         /// <summary>
-        /// The optimization state: (Initial = 1, MatrixProcessing = 2, Optimizing = 3, Optimized = 4, Error = 5, ComputingDirections = 6)
+        /// The optimization state: 
+        /// New = 0,
+        /// Initial = 1, 
+        /// MatrixProcessing = 2, 
+        /// Optimizing = 3, 
+        /// Optimized = 4, 
+        /// Error = 5, 
+        /// ComputingDirections = 6,
+        /// InQueue = 7
         /// </summary>
         [IgnoreDataMember]
         [HttpQueryMemberAttribute(Name = "state", EmitDefaultValue = false)]
         public uint? State { get; set; }
 
+        /// <summary>
+        /// Route Parameters to update.
+        /// (After a PUT there is no guarantee that the route_destination_id values are preserved! It may create copies resulting in new destination IDs, especially when dealing with multiple depots.)
+        /// </summary>
         [DataMember(Name = "parameters", EmitDefaultValue = false)]
         public RouteParameters Parameters { get; set; }
 
+        /// <summary>
+        /// Array of the route addresses
+        /// </summary>
         [DataMember(Name = "addresses", EmitDefaultValue = false)]
         public Address[] Addresses { get; set; }
+
+        /// <summary>
+        /// Array of the depots
+        /// </summary>
+        [DataMember(Name = "depots", EmitDefaultValue = false)]
+        public Address[] Depots { get; set; }
     }
 }

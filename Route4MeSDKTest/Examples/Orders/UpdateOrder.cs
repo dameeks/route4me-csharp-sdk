@@ -4,31 +4,42 @@ using System;
 
 namespace Route4MeSDK.Examples
 {
-  public sealed partial class Route4MeExamples
-  {
-    /// <summary>
-    /// Update Order
-    /// </summary>
-    /// <param name="order"> Order with updated attributes </param>
-    public void UpdateOrder(Order order)
+    public sealed partial class Route4MeExamples
     {
-      // Create the manager with the api key
-      Route4MeManager route4Me = new Route4MeManager(c_ApiKey);
+        /// <summary>
+        /// Update Order
+        /// </summary>
+        /// <param name="order1"> Order with updated attributes </param>
+        public void UpdateOrder(Order order1 = null)
+        {
+            // Create the manager with the api key
+            var route4Me = new Route4MeManager(ActualApiKey);
 
-      // Run the query
-      string errorString;
-      Order updatedOrder = route4Me.UpdateOrder(order, out errorString);
+            bool isInnerExample = (order1 == null ? true : false);
 
-      Console.WriteLine("");
+            if (isInnerExample) CreateExampleOrder();
 
-      if (updatedOrder != null)
-      {
-        Console.WriteLine("UpdateOrder executed successfully");
-      }
-      else
-      {
-        Console.WriteLine("UpdateOrder error: {0}", errorString);
-      }
+            string orderId = isInnerExample
+                ? OrdersToRemove[OrdersToRemove.Count - 1]
+                : order1.order_id.ToString();
+
+            var orderParameters = new OrderParameters()
+            {
+                order_id = orderId
+            };
+
+            Order order = route4Me.GetOrderByID(
+                orderParameters,
+                out string errorString);
+
+            order.EXT_FIELD_last_name = "Updated " + (new Random()).Next().ToString();
+
+            // Run the query
+            var updatedOrder = route4Me.UpdateOrder(order, out errorString);
+
+            PrintExampleOrder(updatedOrder, errorString);
+
+            if (isInnerExample) RemoveTestOrders();
+        }
     }
-  }
 }

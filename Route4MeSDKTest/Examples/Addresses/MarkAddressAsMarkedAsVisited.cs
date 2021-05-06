@@ -1,6 +1,5 @@
 ﻿using Route4MeSDK.DataTypes;
 using Route4MeSDK.QueryTypes;
-using System;
 using System.Collections.Generic;
 
 namespace Route4MeSDK.Examples
@@ -10,32 +9,34 @@ namespace Route4MeSDK.Examples
         /// <summary>
         /// Mark Address as Marked as Visited
         /// </summary>
-        /// <returns> status </returns>
-        public void MarkAddressAsMarkedAsVisited(AddressParameters aParams)
+        /// <param name="aParams">Address parameters</param>
+        public void MarkAddressAsMarkedAsVisited(AddressParameters aParams = null)
         {
             // Create the manager with the api key
-            Route4MeManager route4Me = new Route4MeManager(c_ApiKey);
+            var route4Me = new Route4MeManager(ActualApiKey);
+
+            bool isInnerExample = aParams == null ? true : false;
+
+            if (isInnerExample)
+            {
+                RunOptimizationSingleDriverRoute10Stops();
+                OptimizationsToRemove = new List<string>() { SD10Stops_optimization_problem_id };
+
+                aParams = new AddressParameters
+                {
+                    RouteId = SD10Stops_route_id,
+                    RouteDestinationId = (int)SD10Stops_route.Addresses[2].RouteDestinationId,
+                    IsVisited = true
+                };
+            }
 
             // Run the query
+            Address resultAddress = route4Me
+                .MarkAddressAsMarkedAsVisited(aParams, out string errorString);
 
-            string errorString = "";
-            Address resultAddress = route4Me.MarkAddressAsMarkedAsVisited(aParams, out errorString);
+            PrintExampleDestination(resultAddress, errorString);
 
-            Console.WriteLine("");
-
-            if (resultAddress != null)
-            {
-                Console.WriteLine("MarkAddressAsMarkedAsVisited executed successfully");
-
-                Console.WriteLine("Marked Address ID: {0}", resultAddress.RouteDestinationId);
-
-            }
-            else
-            {
-                Console.WriteLine("MarkAddressAsMarkedAsVisited error: {0}", errorString);
-
-            }
-
+            if (isInnerExample) RemoveTestOptimizations();
         }
     }
 }

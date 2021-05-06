@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Web.UI.WebControls;
 
 namespace Route4MeSDK.DataTypes
 {
@@ -10,7 +11,7 @@ namespace Route4MeSDK.DataTypes
     /// <para>CVRP_TW_MD = 4, multiple depot, multiple driver, capacitated, time windows</para>
     /// <para>TSP_TW = 5, single depot, single driver, time windows</para>
     /// <para>TSP_TW_CR = 6, single depot, single driver, time windows, continuous optimization (minimal location shifting)</para>
-    /// <para>BBCVRP = 7, shifts addresses from one route to another over time on a recurring schedule</para>
+    /// <para>ADVANCED_CVRP_TW = 9, optimization with advanced constraints</para>
     /// <para>ALG_NONE = 100</para>
     /// <para>ALG_LEGACY_DISTRIBUTED = 101</para>
     /// </summary>
@@ -22,7 +23,7 @@ namespace Route4MeSDK.DataTypes
         CVRP_TW_MD = 4,
         TSP_TW = 5,
         TSP_TW_CR = 6,
-        BBCVRP = 7,
+        ADVANCED_CVRP_TW = 9,
         ALG_NONE = 100,
         ALG_LEGACY_DISTRIBUTED = 101
     }
@@ -156,12 +157,14 @@ namespace Route4MeSDK.DataTypes
     /// </summary>
     public enum OptimizationState : uint
     {
+        New = 0,
         Initial = 1,
         MatrixProcessing = 2,
         Optimizing = 3,
         Optimized = 4,
         Error = 5,
-        ComputingDirections = 6
+        ComputingDirections = 6,
+        InQueue = 7
     }
 
     /// <summary>
@@ -247,6 +250,33 @@ namespace Route4MeSDK.DataTypes
     }
 
     /// <summary>
+    /// Address stop type.
+    /// </summary>
+    public enum AddressStopType : uint
+    {
+        [Description("DELIVERY")]
+        Delivery,
+
+        [Description("PICKUP")]
+        PickUp,
+
+        [Description("BREAK")]
+        Break,
+
+        [Description("MEETUP")]
+        MeetUp,
+
+        [Description("SERVICE")]
+        Service,
+
+        [Description("VISIT")]
+        Visit,
+
+        [Description("DRIVEBY")]
+        DriverBy,
+    }
+
+    /// <summary>
     /// Enumeration of the territory types
     /// </summary>
     public enum TerritoryType : uint
@@ -260,4 +290,82 @@ namespace Route4MeSDK.DataTypes
         [Description("rect")]
         Rect
     }
+
+    #region Address Bundling
+
+    /// <summary>
+    /// Enumeration of the address bundling mode:
+    /// <para>Address = 1, group locations by address</para>
+    /// <para>Coordinates = 2, group locations by coordinates</para>
+    /// <para>AddressId = 3, group locations by list of the address IDs</para>
+    /// <para>Address = 4, group locations by address custom fields</para>
+    /// </summary>
+    public enum AddressBundlingMode : uint
+    {
+        Address = 1,
+        Coordinates = 2,
+        AddressId = 3,
+        AddressCustomField = 4
+    }
+
+    /// <summary>
+    /// Enumeration of the destinations merge mode:
+    /// <para>KeepAsSeparateDestinations = 1, keep separate destinations in output</para>
+    /// <para>MergeIntoSingleDestination = 2, merge the bundled destinations in one destination in output</para>
+    /// </summary>
+    public enum AddressBundlingMergeMode : uint
+    {
+        KeepAsSeparateDestinations = 1,
+        MergeIntoSingleDestination = 2
+    }
+
+    /// <summary>
+    /// Enumeration of the service time first item mode:
+    /// <para>KeepOriginal = 1, keep original service time</para>
+    /// <para>CustomTime = 2, set custom time to service time</para>
+    /// </summary>
+    public enum AddressBundlingFirstItemMode : uint
+    {
+        KeepOriginal = 1,
+        CustomTime = 2
+    }
+
+    /// <summary>
+    /// Enumeration of the service time additional items mode:
+    /// <para>KeepOriginal = 1, preserve original address service time</para>
+    /// <para>CustomTime = 2, set custom times</para>
+    /// <para>InheritFromPrimary = 3, don't add service times</para>
+    /// </summary>
+    public enum AddressBundlingAdditionalItemsMode : uint
+    {
+        KeepOriginal = 1,
+        CustomTime = 2,
+        InheritFromPrimary = 3
+    }
+
+    /// <summary>
+    /// Telematics vendor types
+    /// </summary>
+    public enum TelematicsVendorType : uint
+    {
+        [Description("tomtom")]
+        Tomtom,
+
+        [Description("teletrac")]
+        Teletrac,
+
+        [Description("azuga")]
+        Azuga,
+
+        [Description("geotab")]
+        Geotab,
+
+        [Description("silentpassenger")]
+        SilentPassenger,
+
+        [Description("new_teletrac")]
+        NewTeletrac
+    }
+
+    #endregion
 }
